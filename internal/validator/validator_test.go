@@ -111,6 +111,7 @@ func TestNew(t *testing.T) {
 	v := New(nil)
 	if v == nil {
 		t.Error("New() should return a non-nil validator")
+		return
 	}
 	if v.client != nil {
 		t.Error("Validator client should be nil when passed nil")
