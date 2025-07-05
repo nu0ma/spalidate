@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-integration setup-integration cleanup-integration build
+.PHONY: test test-unit test-integration setup-integration cleanup-integration build install-spemu
 
 # Default target
 test: test-unit test-integration
@@ -7,38 +7,38 @@ test: test-unit test-integration
 test-unit:
 	go test ./internal/...
 
+# Install spemu tool
+install-spemu:
+	go install github.com/nu0ma/spemu@latest
+
 # Integration tests
-test-integration: setup-integration
+test-integration: install-spemu setup-integration
 	@echo "Running integration tests..."
-	go test -v -tags=integration ./integration_test.go
+	SPANNER_EMULATOR_HOST=localhost:9010 go test -v -tags=integration ./integration_test.go
 	@$(MAKE) cleanup-integration
 
 # Setup integration test environment
 setup-integration:
 	@echo "Setting up integration test environment..."
-	cd testdata && docker compose up -d
+	@echo "Starting Spanner emulator..."
+	docker run -d --name spanner-emulator \
+		-p 9010:9010 -p 9020:9020 \
+		gcr.io/cloud-spanner-emulator/emulator:1.5.6
 	@echo "Waiting for Spanner emulator to be ready..."
-	timeout 300 bash -c 'until nc -z localhost 9010; do sleep 1; done'
-	@echo "Waiting additional time for full readiness..."
-	sleep 5
-	@echo "Configuring gcloud in container..."
-	docker exec spanner-emulator gcloud config set auth/disable_credentials true
-	docker exec spanner-emulator gcloud config set project test-project
-	docker exec spanner-emulator gcloud config set api_endpoint_overrides/spanner http://localhost:9010/
-	@echo "Creating Spanner instance..."
-	docker exec spanner-emulator gcloud spanner instances create test-instance --config=emulator-config --description="Test Instance" --nodes=1
-	@echo "Creating test database..."
-	docker exec spanner-emulator gcloud spanner databases create test-database --instance=test-instance --project=test-project
-	@echo "Loading schema..."
-	docker exec -i spanner-emulator gcloud spanner databases ddl update test-database --instance=test-instance --project=test-project --ddl-file=/dev/stdin < testdata/schema.sql
+	timeout 60 bash -c 'until nc -z localhost 9010; do sleep 1; done'
+	@echo "Spanner emulator is ready!"
+	@echo "Initializing database schema..."
+	SPANNER_EMULATOR_HOST=localhost:9010 spemu --project test-project --instance test-instance --database test-database --init-schema testdata/schema.sql --verbose
 	@echo "Loading test data..."
-	docker exec -i spanner-emulator gcloud spanner databases execute-sql test-database --instance=test-instance --project=test-project --sql="$$(cat testdata/seed.sql)"
+	SPANNER_EMULATOR_HOST=localhost:9010 spemu --project test-project --instance test-instance --database test-database testdata/seed.sql --verbose
+	@echo "Setup complete!"
 
 # Cleanup integration test environment
 cleanup-integration:
 	@echo "Cleaning up integration test environment..."
-	cd testdata && docker compose down -v
-	docker system prune -f
+	docker stop spanner-emulator || true
+	docker rm spanner-emulator || true
+	@echo "Cleanup complete!"
 
 # Build the application
 build:
@@ -53,3 +53,17 @@ deps:
 clean:
 	rm -f spalidate
 	go clean
+
+# Help target
+help:
+	@echo "Available targets:"
+	@echo "  test              - Run all tests (unit + integration)"
+	@echo "  test-unit         - Run unit tests only"  
+	@echo "  test-integration  - Run integration tests with Spanner emulator"
+	@echo "  build             - Build the application binary"
+	@echo "  install-spemu     - Install spemu tool for Spanner operations"
+	@echo "  setup-integration - Set up Spanner emulator for testing"
+	@echo "  cleanup-integration - Clean up Spanner emulator"
+	@echo "  deps              - Download and tidy Go dependencies"
+	@echo "  clean             - Clean build artifacts"
+	@echo "  help              - Show this help message"

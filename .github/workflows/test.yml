@@ -59,42 +59,40 @@ jobs:
     - name: Download dependencies
       run: go mod download
     
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+    - name: Install spemu
+      run: go install github.com/nu0ma/spemu@latest
     
     - name: Start Spanner Emulator
       run: |
-        cd testdata
-        docker compose up -d
+        docker run -d --name spanner-emulator \
+          -p 9010:9010 -p 9020:9020 \
+          gcr.io/cloud-spanner-emulator/emulator:1.5.6
         echo "Waiting for Spanner emulator to be ready..."
-        timeout 300 bash -c 'until nc -z localhost 9010; do sleep 1; done'
+        timeout 60 bash -c 'until nc -z localhost 9010; do sleep 1; done'
+        echo "Spanner emulator is ready!"
     
-    - name: Set up test environment
+    - name: Initialize schema with spemu
+      env:
+        SPANNER_EMULATOR_HOST: localhost:9010
       run: |
-        export SPANNER_EMULATOR_HOST=localhost:9010
-        # Wait a bit more for emulator to be fully ready
-        sleep 5
-        
-        # Create instance and database using gcloud CLI in container
-        docker exec spanner-emulator gcloud config set auth/disable_credentials true
-        docker exec spanner-emulator gcloud config set project test-project
-        docker exec spanner-emulator gcloud config set api_endpoint_overrides/spanner http://localhost:9010/
-        docker exec spanner-emulator gcloud spanner instances create test-instance --config=emulator-config --description="Test Instance" --nodes=1
-        docker exec spanner-emulator gcloud spanner databases create test-database --instance=test-instance --project=test-project
-        
-        # Load schema
-        docker exec -i spanner-emulator gcloud spanner databases ddl update test-database --instance=test-instance --project=test-project --ddl-file=/dev/stdin < testdata/schema.sql
-        
-        # Load test data
-        docker exec -i spanner-emulator gcloud spanner databases execute-sql test-database --instance=test-instance --project=test-project --sql="$(cat testdata/seed.sql)"
+        echo "Initializing database schema..."
+        spemu --project test-project --instance test-instance --database test-database --init-schema testdata/schema.sql --verbose
+    
+    - name: Load test data with spemu
+      env:
+        SPANNER_EMULATOR_HOST: localhost:9010
+      run: |
+        echo "Loading test data..."
+        spemu --project test-project --instance test-instance --database test-database testdata/seed.sql --verbose
     
     - name: Run integration tests
+      env:
+        SPANNER_EMULATOR_HOST: localhost:9010
       run: |
-        export SPANNER_EMULATOR_HOST=localhost:9010
         go test -v -tags=integration ./integration_test.go
     
     - name: Cleanup
       if: always()
       run: |
-        cd testdata
-        docker compose down -v
+        docker stop spanner-emulator || true
+        docker rm spanner-emulator || true
