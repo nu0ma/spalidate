@@ -1,0 +1,8 @@
+tables:
+  Products:
+    count: 2  # We'll only insert 1 product
+    columns:
+      ProductID: "prod-001"
+      Name: "Test Product"
+      Price: 1000
+      IsActive: true

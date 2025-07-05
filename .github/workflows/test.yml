@@ -20,7 +20,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: '1.22'
     
     - name: Cache Go modules
       uses: actions/cache@v3
@@ -70,13 +70,25 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     
+    services:
+      spanner:
+        image: gcr.io/cloud-spanner-emulator/emulator:latest
+        ports:
+          - 9010:9010
+          - 9020:9020
+        options: >-
+          --health-cmd "curl -f http://localhost:9020/ || exit 1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    
     steps:
     - uses: actions/checkout@v4
     
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: '1.22'
     
     - name: Cache Go modules
       uses: actions/cache@v3
@@ -99,3 +111,20 @@ jobs:
     
     - name: Test version command
       run: ./spalidate --version
+    
+    - name: Wait for Spanner emulator
+      run: |
+        for i in {1..30}; do
+          if curl -f http://localhost:9020/ > /dev/null 2>&1; then
+            echo "Spanner emulator is ready!"
+            break
+          fi
+          echo "Waiting for Spanner emulator... ($i/30)"
+          sleep 2
+        done
+    
+    - name: Run integration tests
+      env:
+        SPANNER_EMULATOR_HOST: localhost:9010
+        GOOGLE_CLOUD_PROJECT: test-project
+      run: go test -v -race -tags=integration ./integration/...

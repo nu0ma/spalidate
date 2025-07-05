@@ -1,0 +1,15 @@
+tables:
+  Users:
+    count: 1
+    columns:
+      UserID: "user-001"
+      Name: "Test User"
+      Email: "test@example.com"
+      Status: 1
+  Products:
+    count: 2
+    columns:
+      ProductID: "prod-001"
+      Name: "Test Product"
+      Price: 1000
+      IsActive: true

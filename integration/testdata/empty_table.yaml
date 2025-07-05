@@ -1,0 +1,4 @@
+tables:
+  Users:
+    count: 0
+    columns: {}

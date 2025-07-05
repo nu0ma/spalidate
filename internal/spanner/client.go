@@ -3,9 +3,13 @@ package spanner
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"cloud.google.com/go/spanner"
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Client struct {
@@ -20,7 +24,19 @@ func NewClient(project, instance, database string, port int) (*Client, error) {
 
 	databasePath := fmt.Sprintf("projects/%s/instances/%s/databases/%s", project, instance, database)
 
-	client, err := spanner.NewClient(ctx, databasePath)
+	// Check if we're using the emulator
+	var opts []option.ClientOption
+	if emulatorHost := os.Getenv("SPANNER_EMULATOR_HOST"); emulatorHost != "" {
+		// For emulator, use insecure connection
+		conn, err := grpc.Dial(emulatorHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			return nil, fmt.Errorf("failed to dial emulator: %w", err)
+		}
+		opts = append(opts, option.WithGRPCConn(conn))
+	}
+
+	// The Spanner client library automatically detects and uses SPANNER_EMULATOR_HOST
+	client, err := spanner.NewClient(ctx, databasePath, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Spanner client: %w", err)
 	}

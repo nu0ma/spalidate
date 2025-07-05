@@ -1,0 +1,21 @@
+tables:
+  Users:
+    count: 2
+    columns:
+      UserID: "user-001"
+      Name: "User One"
+      Email: "user1@example.com"
+      Status: 1
+  Products:
+    count: 1
+    columns:
+      ProductID: "prod-001"
+      Name: "Product One"
+      Price: 1500
+      IsActive: true
+  Orders:
+    count: 1
+    columns:
+      OrderID: "order-001"
+      UserID: "user-001"
+      Total: 1500.5

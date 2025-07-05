@@ -1,0 +1,16 @@
+tables:
+  - name: users
+    expected_count: 1
+    expected_values:
+      - column: name
+        row: 0
+        value: "Alice"
+      - column: email
+        row: 0
+        value: null  # Expecting null value
+      - column: active
+        row: 0
+        value: true
+      - column: score
+        row: 0
+        value: null  # Expecting null value

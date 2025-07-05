@@ -1,0 +1,40 @@
+tables:
+  - name: users
+    expected_count: 2
+    expected_values:
+      - column: name
+        row: 0
+        value: "Alice"
+      - column: email
+        row: 0
+        value: "alice@example.com"
+      - column: active
+        row: 0
+        value: true
+      - column: score
+        row: 0
+        value: 95.5
+      - column: name
+        row: 1
+        value: "Bob"
+      - column: email
+        row: 1
+        value: "bob@example.com"
+      - column: active
+        row: 1
+        value: false
+      - column: score
+        row: 1
+        value: 87.3
+  - name: products
+    expected_count: 1
+    expected_values:
+      - column: name
+        row: 0
+        value: "Product A"
+      - column: price
+        row: 0
+        value: 29.99
+      - column: stock
+        row: 0
+        value: 100

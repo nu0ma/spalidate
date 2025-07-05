@@ -108,9 +108,66 @@ go build -o spalidate main.go
 ```
 
 ### Running tests
+
+#### Unit tests
 ```bash
 go test ./internal/...
 ```
+
+#### Integration tests
+Integration tests require Docker and docker-compose to run a local Spanner emulator.
+
+Using the helper script (recommended):
+```bash
+./scripts/test-integration.sh
+```
+
+Or manually with Docker Compose:
+```bash
+# Start Spanner emulator
+docker-compose up -d spanner-emulator
+
+# Wait for emulator to be healthy
+docker-compose ps  # Check status
+
+# Run integration tests  
+docker-compose run --rm integration-tests
+
+# Cleanup
+docker-compose down
+```
+
+Or run tests locally (requires running emulator):
+```bash
+# Start Spanner emulator
+docker-compose up -d spanner-emulator
+
+# Run integration tests with build tag
+SPANNER_EMULATOR_HOST=localhost:9010 GOOGLE_CLOUD_PROJECT=test-project \
+  go test -v -tags=integration ./integration/...
+
+# Cleanup
+docker-compose down
+```
+
+The integration tests validate:
+- Successful validation scenarios with correct data
+- Row count mismatch detection
+- Column value mismatch detection  
+- Non-existent table handling
+- Null value handling
+- Type conversion and comparison
+
+Test data is defined in YAML files under `integration/testdata/`.
+
+### Docker setup
+The project includes Docker configuration for both the application and integration testing:
+
+- `Dockerfile`: Builds the spalidate binary in a minimal Alpine container
+- `docker-compose.yml`: Sets up Spanner emulator for local development and testing
+
+### Environment variables
+- `SPANNER_EMULATOR_HOST`: When set, the tool will connect to a Spanner emulator instead of real Spanner. Format: `host:port`
 
 ## License
 

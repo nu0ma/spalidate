@@ -1,0 +1,10 @@
+tables:
+  - name: users
+    expected_count: 1
+    expected_values:
+      - column: name
+        row: 0
+        value: "Alice"
+      - column: score
+        row: 0
+        value: 95.5  # Will fail - actual value is 50.0

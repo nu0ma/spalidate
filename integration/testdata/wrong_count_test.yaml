@@ -1,0 +1,7 @@
+tables:
+  - name: users
+    expected_count: 2  # Will fail - only 1 row seeded
+    expected_values:
+      - column: name
+        row: 0
+        value: "Alice"

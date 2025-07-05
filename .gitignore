@@ -65,3 +65,9 @@ dist/
 spanlidate
 
 .claude/settings.local.json
+
+# Integration test binary
+integration.test
+
+# Local development overrides
+docker-compose.override.yml

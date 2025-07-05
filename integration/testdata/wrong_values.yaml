@@ -1,0 +1,8 @@
+tables:
+  Users:
+    count: 1
+    columns:
+      UserID: "user-001"
+      Name: "Expected Name"  # Actual will be "Different Name"
+      Email: "expected@example.com"  # Actual will be "different@example.com"
+      Status: 1  # Actual will be 2

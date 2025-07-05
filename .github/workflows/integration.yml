@@ -1,0 +1,84 @@
+name: Integration Tests
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'integration/**'
+      - '.github/workflows/integration.yml'
+      - 'Dockerfile'
+      - 'docker-compose*.yml'
+
+jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+    
+    services:
+      spanner:
+        image: gcr.io/cloud-spanner-emulator/emulator:latest
+        ports:
+          - 9010:9010
+          - 9020:9020
+        options: >-
+          --health-cmd "curl -f http://localhost:9020/ || exit 1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+    
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    
+    - name: Download dependencies
+      run: go mod download
+    
+    - name: Build binary
+      run: go build -v -o spalidate .
+    
+    - name: Wait for Spanner emulator
+      run: |
+        echo "Waiting for Spanner emulator to be ready..."
+        for i in {1..60}; do
+          if curl -f http://localhost:9020/ > /dev/null 2>&1; then
+            echo "Spanner emulator is ready!"
+            break
+          fi
+          echo "Waiting... ($i/60)"
+          sleep 2
+        done
+        
+        # Final check
+        curl -f http://localhost:9020/ || (echo "Spanner emulator failed to start" && exit 1)
+    
+    - name: Run integration tests
+      env:
+        SPANNER_EMULATOR_HOST: localhost:9010
+      run: |
+        echo "Running integration tests..."
+        go test -v -race -timeout 10m ./integration/...
+    
+    - name: Upload test results
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: integration-test-results
+        path: |
+          *.log
+          integration/*.log

@@ -1,0 +1,7 @@
+tables:
+  - name: non_existent_table  # Will fail - table doesn't exist
+    expected_count: 1
+    expected_values:
+      - column: id
+        row: 0
+        value: 1

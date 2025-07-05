@@ -1,0 +1,31 @@
+version: '3.8'
+
+# Docker Compose configuration for running integration tests
+services:
+  spanner-emulator:
+    image: gcr.io/cloud-spanner-emulator/emulator:latest
+    ports:
+      - "9010:9010"
+      - "9020:9020"
+    environment:
+      - SPANNER_EMULATOR_HOST=0.0.0.0:9010
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9020/"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  integration-test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder  # Stop at builder stage for testing
+    depends_on:
+      spanner-emulator:
+        condition: service_healthy
+    environment:
+      - SPANNER_EMULATOR_HOST=spanner-emulator:9010
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: ["go", "test", "-v", "./integration/..."]
