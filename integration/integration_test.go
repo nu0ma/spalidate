@@ -13,8 +13,8 @@ import (
 
 	"cloud.google.com/go/spanner"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
-	instance "cloud.google.com/go/spanner/admin/instance/apiv1"
 	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
+	instance "cloud.google.com/go/spanner/admin/instance/apiv1"
 	"cloud.google.com/go/spanner/admin/instance/apiv1/instancepb"
 	"github.com/nu0ma/spalidate/internal/config"
 	"github.com/nu0ma/spalidate/internal/validator"
@@ -33,16 +33,16 @@ const (
 )
 
 type testEnv struct {
-	ctx            context.Context
-	instanceAdmin  *instance.InstanceAdminClient
-	databaseAdmin  *database.DatabaseAdminClient
-	spannerClient  *spanner.Client
-	databaseName   string
+	ctx           context.Context
+	instanceAdmin *instance.InstanceAdminClient
+	databaseAdmin *database.DatabaseAdminClient
+	spannerClient *spanner.Client
+	databaseName  string
 }
 
 func setupTestEnvironment(t *testing.T) *testEnv {
 	ctx := context.Background()
-	
+
 	// Get emulator host from environment
 	emulatorHost := os.Getenv("SPANNER_EMULATOR_HOST")
 	if emulatorHost == "" {
@@ -73,7 +73,7 @@ func setupTestEnvironment(t *testing.T) *testEnv {
 		},
 	})
 	require.NoError(t, err)
-	
+
 	_, err = op.Wait(ctx)
 	require.NoError(t, err)
 
@@ -100,7 +100,7 @@ func setupTestEnvironment(t *testing.T) *testEnv {
 		},
 	})
 	require.NoError(t, err)
-	
+
 	_, err = dbOp.Wait(ctx)
 	require.NoError(t, err)
 
@@ -119,7 +119,7 @@ func setupTestEnvironment(t *testing.T) *testEnv {
 
 func (env *testEnv) cleanup(t *testing.T) {
 	env.spannerClient.Close()
-	
+
 	// Delete database
 	err := env.databaseAdmin.DropDatabase(env.ctx, &databasepb.DropDatabaseRequest{
 		Database: env.databaseName,
@@ -127,7 +127,7 @@ func (env *testEnv) cleanup(t *testing.T) {
 	if err != nil {
 		t.Logf("Failed to delete database: %v", err)
 	}
-	
+
 	// Delete instance
 	err = env.instanceAdmin.DeleteInstance(env.ctx, &instancepb.DeleteInstanceRequest{
 		Name: fmt.Sprintf("projects/%s/instances/%s", testProject, testInstance),
@@ -135,7 +135,7 @@ func (env *testEnv) cleanup(t *testing.T) {
 	if err != nil {
 		t.Logf("Failed to delete instance: %v", err)
 	}
-	
+
 	env.instanceAdmin.Close()
 	env.databaseAdmin.Close()
 }
@@ -185,12 +185,12 @@ func TestValidationSuccess(t *testing.T) {
 
 	// Load test config
 	cfg := loadConfig(t, "success_test.yaml")
-	
+
 	// Run validation
 	v := validator.New(env.spannerClient)
 	results, err := v.Validate(env.ctx, cfg)
 	require.NoError(t, err)
-	
+
 	// Check results
 	assert.True(t, results.Success)
 	assert.Empty(t, results.Errors)
@@ -212,12 +212,12 @@ func TestValidationFailureWrongRowCount(t *testing.T) {
 
 	// Load test config expecting 2 rows
 	cfg := loadConfig(t, "wrong_count_test.yaml")
-	
+
 	// Run validation
 	v := validator.New(env.spannerClient)
 	results, err := v.Validate(env.ctx, cfg)
 	require.NoError(t, err)
-	
+
 	// Check results
 	assert.False(t, results.Success)
 	assert.NotEmpty(t, results.Errors)
@@ -239,12 +239,12 @@ func TestValidationFailureWrongValue(t *testing.T) {
 
 	// Load test config
 	cfg := loadConfig(t, "wrong_value_test.yaml")
-	
+
 	// Run validation
 	v := validator.New(env.spannerClient)
 	results, err := v.Validate(env.ctx, cfg)
 	require.NoError(t, err)
-	
+
 	// Check results
 	assert.False(t, results.Success)
 	assert.NotEmpty(t, results.Errors)
@@ -257,12 +257,12 @@ func TestValidationTableNotFound(t *testing.T) {
 
 	// Load test config with non-existent table
 	cfg := loadConfig(t, "table_not_found_test.yaml")
-	
+
 	// Run validation
 	v := validator.New(env.spannerClient)
 	results, err := v.Validate(env.ctx, cfg)
 	require.NoError(t, err)
-	
+
 	// Check results
 	assert.False(t, results.Success)
 	assert.NotEmpty(t, results.Errors)
@@ -284,12 +284,12 @@ func TestValidationWithNullValues(t *testing.T) {
 
 	// Load test config
 	cfg := loadConfig(t, "null_values_test.yaml")
-	
+
 	// Run validation
 	v := validator.New(env.spannerClient)
 	results, err := v.Validate(env.ctx, cfg)
 	require.NoError(t, err)
-	
+
 	// Check results based on config expectations
 	assert.True(t, results.Success)
 }
