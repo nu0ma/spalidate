@@ -15,10 +15,10 @@ const version = "v1.0.0"
 
 func main() {
 	var (
-		projectID  = flag.String("project-id", "", "Google Cloud Project ID")
-		configPath = flag.String("config", "", "Path to YAML configuration file")
+		projectID   = flag.String("project-id", "", "Google Cloud Project ID")
+		configPath  = flag.String("config", "", "Path to YAML configuration file")
 		showVersion = flag.Bool("version", false, "Show version information")
-		verbose    = flag.Bool("verbose", false, "Enable verbose logging")
+		verbose     = flag.Bool("verbose", false, "Enable verbose logging")
 	)
 	flag.Parse()
 
@@ -66,7 +66,7 @@ func main() {
 	}
 
 	validator := validator.New(spannerClient)
-	
+
 	results, err := validator.Validate(cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error during validation: %v\n", err)
