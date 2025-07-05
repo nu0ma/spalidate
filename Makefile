@@ -18,7 +18,7 @@ setup-integration:
 	@echo "Setting up integration test environment..."
 	cd testdata && docker compose up -d
 	@echo "Waiting for Spanner emulator to be ready..."
-	timeout 60 bash -c 'until nc -z localhost 9010; do sleep 1; done'
+	timeout 300 bash -c 'until nc -z localhost 9010; do sleep 1; done'
 	@echo "Waiting additional time for full readiness..."
 	sleep 5
 	@echo "Configuring gcloud in container..."
