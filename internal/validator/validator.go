@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/ishikawaryoufutoshi/spanlidate/internal/config"
-	"github.com/ishikawaryoufutoshi/spanlidate/internal/spanner"
+	"github.com/nu0ma/spalidate/internal/config"
+	"github.com/nu0ma/spalidate/internal/spanner"
 )
 
 type Validator struct {
@@ -103,7 +103,7 @@ func (v *Validator) validateColumns(tableName string, tableConfig config.TableCo
 		}
 
 		if !v.compareValues(expectedValue, actualValue) {
-			result.AddError(fmt.Sprintf("Table %s, column %s: expected %v (%T), got %v (%T)", 
+			result.AddError(fmt.Sprintf("Table %s, column %s: expected %v (%T), got %v (%T)",
 				tableName, columnName, expectedValue, expectedValue, actualValue, actualValue))
 		} else {
 			result.AddMessage(fmt.Sprintf("Table %s, column %s: value matches", tableName, columnName))

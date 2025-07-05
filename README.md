@@ -1,17 +1,17 @@
-# Spanlidate
+# Spalidate
 
 A command-line tool for validating data in Google Cloud Spanner emulator against YAML configuration files.
 
 ## Installation
 
 ```bash
-go install github.com/ishikawaryoufutoshi/spanlidate@latest
+go install github.com/nu0ma/spalidate@latest
 ```
 
 ## Usage
 
 ```bash
-spanlidate --project-id=my-project --config=validation.yaml
+spalidate --project-id=my-project --config=validation.yaml
 ```
 
 ### Flags
@@ -58,12 +58,12 @@ tables:
 
 ### Basic validation
 ```bash
-spanlidate --project-id=test-project --config=./validation.yaml
+spalidate --project-id=test-project --config=./validation.yaml
 ```
 
 ### Verbose output
 ```bash
-spanlidate --project-id=test-project --config=./validation.yaml --verbose
+spalidate --project-id=test-project --config=./validation.yaml --verbose
 ```
 
 ### Example output (success)
@@ -91,9 +91,9 @@ Make sure your Spanner emulator is running and accessible with the specified pro
 
 ### Building from source
 ```bash
-git clone https://github.com/ishikawaryoufutoshi/spanlidate.git
-cd spanlidate
-go build -o spanlidate main.go
+git clone https://github.com/nu0ma/spalidate.git
+cd spalidate
+go build -o spalidate main.go
 ```
 
 ### Running tests

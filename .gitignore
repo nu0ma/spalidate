@@ -41,7 +41,7 @@ Thumbs.db
 *.log
 
 # Build artifacts
-/spanlidate
+/spalidate
 /dist/
 /build/
 

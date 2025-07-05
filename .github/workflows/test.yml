@@ -59,12 +59,12 @@ jobs:
       run: go test -v -race -coverprofile=coverage.out ./internal/...
     
     - name: Build binary
-      run: go build -v -o spanlidate .
+      run: go build -v -o spalidate .
     
     - name: Test go install
       run: |
         go install .
-        spanlidate --version
+        spalidate --version
 
   integration:
     runs-on: ubuntu-latest
@@ -92,10 +92,10 @@ jobs:
       run: go mod download
     
     - name: Build binary
-      run: go build -v -o spanlidate .
+      run: go build -v -o spalidate .
     
     - name: Test help command
-      run: ./spanlidate --help || true
+      run: ./spalidate --help || true
     
     - name: Test version command
-      run: ./spanlidate --version
+      run: ./spalidate --version

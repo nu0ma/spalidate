@@ -63,9 +63,9 @@ jobs:
         run: |
           mkdir -p dist
           if [ "$GOOS" = "windows" ]; then
-            go build -o dist/spanlidate-${{ matrix.goos }}-${{ matrix.goarch }}.exe .
+            go build -o dist/spalidate-${{ matrix.goos }}-${{ matrix.goarch }}.exe .
           else
-            go build -o dist/spanlidate-${{ matrix.goos }}-${{ matrix.goarch }} .
+            go build -o dist/spalidate-${{ matrix.goos }}-${{ matrix.goarch }} .
           fi
 
       - name: Upload Release Artifact
@@ -73,7 +73,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "${{ matrix.goos }}" = "windows" ]; then
-            gh release upload ${{ needs.release-please.outputs.tag_name }} dist/spanlidate-${{ matrix.goos }}-${{ matrix.goarch }}.exe
+            gh release upload ${{ needs.release-please.outputs.tag_name }} dist/spalidate-${{ matrix.goos }}-${{ matrix.goarch }}.exe
           else
-            gh release upload ${{ needs.release-please.outputs.tag_name }} dist/spanlidate-${{ matrix.goos }}-${{ matrix.goarch }}
+            gh release upload ${{ needs.release-please.outputs.tag_name }} dist/spalidate-${{ matrix.goos }}-${{ matrix.goarch }}
           fi
