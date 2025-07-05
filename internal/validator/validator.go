@@ -80,7 +80,7 @@ func (v *Validator) validateTable(tableName string, tableConfig config.TableConf
 
 func (v *Validator) validateColumns(tableName string, tableConfig config.TableConfig, result *ValidationResult) error {
 	columnNames := tableConfig.GetColumnNames()
-	rows, err := v.client.QueryRows(tableName, columnNames)
+	rows, err := v.client.QueryRowsWithOrder(tableName, columnNames, tableConfig.OrderBy)
 	if err != nil {
 		return fmt.Errorf("failed to query rows: %w", err)
 	}

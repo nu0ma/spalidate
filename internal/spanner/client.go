@@ -58,6 +58,10 @@ func (c *Client) CountRows(tableName string) (int, error) {
 }
 
 func (c *Client) QueryRows(tableName string, columns []string) ([]Row, error) {
+	return c.QueryRowsWithOrder(tableName, columns, "")
+}
+
+func (c *Client) QueryRowsWithOrder(tableName string, columns []string, orderBy string) ([]Row, error) {
 	ctx := context.Background()
 
 	columnList := "*"
@@ -72,6 +76,9 @@ func (c *Client) QueryRows(tableName string, columns []string) ([]Row, error) {
 	}
 
 	query := fmt.Sprintf("SELECT %s FROM %s", columnList, tableName)
+	if orderBy != "" {
+		query += fmt.Sprintf(" ORDER BY %s", orderBy)
+	}
 	stmt := spanner.Statement{SQL: query}
 
 	iter := c.client.Single().Query(ctx, stmt)

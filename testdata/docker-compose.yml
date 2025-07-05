@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  spanner-emulator:
+    image: gcr.io/cloud-spanner-emulator/emulator:latest
+    container_name: spanner-emulator
+    ports:
+      - "9010:9010"
+      - "9020:9020"
+    command: >
+      /spanner_emulator/gateway_main
+      --hostname=0.0.0.0
+      --port=9010
+      --grpc_port=9020
+    environment:
+      - SPANNER_EMULATOR_HOST=localhost:9010
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "9010"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - spanner-net
+
+  gcloud-cli:
+    image: gcr.io/google.com/cloudsdktool/cloud-sdk:latest
+    container_name: gcloud-cli
+    depends_on:
+      spanner-emulator:
+        condition: service_healthy
+    environment:
+      - SPANNER_EMULATOR_HOST=spanner-emulator:9010
+    networks:
+      - spanner-net
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    command: >
+      bash -c "
+        gcloud config set auth/disable_credentials true &&
+        gcloud config set project test-project &&
+        gcloud config set api_endpoint_overrides/spanner http://spanner-emulator:9010/ &&
+        gcloud spanner instances create test-instance --config=emulator-config --description='Test Instance' --nodes=1 &&
+        echo 'Spanner emulator setup complete'
+      "
+
+networks:
+  spanner-net:
+    driver: bridge

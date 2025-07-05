@@ -13,6 +13,7 @@ type Config struct {
 
 type TableConfig struct {
 	Count   int                    `yaml:"count"`
+	OrderBy string                 `yaml:"order_by,omitempty"`
 	Columns map[string]interface{} `yaml:"columns"`
 }
 
