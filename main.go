@@ -15,8 +15,10 @@ const version = "v1.0.0"
 
 func main() {
 	var (
-		projectID   = flag.String("project-id", "", "Google Cloud Project ID")
-		configPath  = flag.String("config", "", "Path to YAML configuration file")
+		project     = flag.String("project", "", "Spanner project ID")
+		instance    = flag.String("instance", "", "Spanner instance ID")
+		database    = flag.String("database", "", "Spanner database ID")
+		port        = flag.Int("port", 9010, "Spanner emulator port")
 		showVersion = flag.Bool("version", false, "Show version information")
 		verbose     = flag.Bool("verbose", false, "Enable verbose logging")
 	)
@@ -27,24 +29,38 @@ func main() {
 		return
 	}
 
-	if *projectID == "" {
-		fmt.Fprintf(os.Stderr, "Error: --project-id is required\n")
+	if *project == "" {
+		fmt.Fprintf(os.Stderr, "Error: --project is required\n")
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	if *configPath == "" {
-		fmt.Fprintf(os.Stderr, "Error: --config is required\n")
+	if *instance == "" {
+		fmt.Fprintf(os.Stderr, "Error: --instance is required\n")
 		flag.Usage()
 		os.Exit(1)
 	}
+
+	if *database == "" {
+		fmt.Fprintf(os.Stderr, "Error: --database is required\n")
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	args := flag.Args()
+	if len(args) != 1 {
+		fmt.Fprintf(os.Stderr, "Error: config file path is required as positional argument\n")
+		flag.Usage()
+		os.Exit(1)
+	}
+	configPath := args[0]
 
 	if *verbose {
 		log.SetFlags(log.LstdFlags | log.Lshortfile)
 		log.Println("Starting spalidate validation")
 	}
 
-	cfg, err := config.LoadConfig(*configPath)
+	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
 		os.Exit(1)
@@ -54,7 +70,7 @@ func main() {
 		log.Printf("Loaded config with %d tables", len(cfg.Tables))
 	}
 
-	spannerClient, err := spanner.NewClient(*projectID)
+	spannerClient, err := spanner.NewClient(*project, *instance, *database, *port)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating Spanner client: %v\n", err)
 		os.Exit(1)

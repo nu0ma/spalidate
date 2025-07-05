@@ -15,19 +15,19 @@ type Client struct {
 
 type Row map[string]interface{}
 
-func NewClient(projectID string) (*Client, error) {
+func NewClient(project, instance, database string, port int) (*Client, error) {
 	ctx := context.Background()
 
-	database := fmt.Sprintf("projects/%s/instances/test-instance/databases/test-db", projectID)
+	databasePath := fmt.Sprintf("projects/%s/instances/%s/databases/%s", project, instance, database)
 
-	client, err := spanner.NewClient(ctx, database)
+	client, err := spanner.NewClient(ctx, databasePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Spanner client: %w", err)
 	}
 
 	return &Client{
 		client:   client,
-		database: database,
+		database: databasePath,
 	}, nil
 }
 

@@ -11,16 +11,22 @@ go install github.com/nu0ma/spalidate@latest
 ## Usage
 
 ```bash
-spalidate --project-id=my-project --config=validation.yaml
+spalidate --project=test-project --instance=test-instance --database=test-database ./validation.yaml
 ```
 
 ### Flags
 
-- `--project-id`: Google Cloud Project ID (required)
-- `--config`: Path to YAML configuration file (required)
+- `--project`: Spanner project ID (required)
+- `--instance`: Spanner instance ID (required)  
+- `--database`: Spanner database ID (required)
+- `--port`: Spanner emulator port (default: 9010)
 - `--version`: Show version information
 - `--verbose`: Enable verbose logging
 - `--help`: Show help information
+
+### Positional Arguments
+
+- `config-file`: Path to YAML configuration file (required)
 
 ## Configuration File Format
 
@@ -58,12 +64,17 @@ tables:
 
 ### Basic validation
 ```bash
-spalidate --project-id=test-project --config=./validation.yaml
+spalidate --project=test-project --instance=test-instance --database=test-database ./validation.yaml
 ```
 
 ### Verbose output
 ```bash
-spalidate --project-id=test-project --config=./validation.yaml --verbose
+spalidate --project=test-project --instance=test-instance --database=test-database --verbose ./validation.yaml
+```
+
+### Custom emulator port
+```bash
+spalidate --project=test-project --instance=test-instance --database=test-database --port=9020 ./validation.yaml
 ```
 
 ### Example output (success)
@@ -80,12 +91,12 @@ Validation failed:
 
 ## Spanner Connection
 
-The tool connects to Spanner using the default database path:
+The tool connects to Spanner using the database path constructed from your parameters:
 ```
-projects/{project-id}/instances/test-instance/databases/test-db
+projects/{project}/instances/{instance}/databases/{database}
 ```
 
-Make sure your Spanner emulator is running and accessible with the specified project ID.
+Make sure your Spanner emulator is running and accessible with the specified project, instance, and database.
 
 ## Development
 
