@@ -1,4 +1,4 @@
-module github.com/ishikawaryoufutoshi/spanlidate
+module github.com/nu0ma/spalidate
 
 go 1.24.3
 

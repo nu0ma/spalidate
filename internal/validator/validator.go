@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/ishikawaryoufutoshi/spanlidate/internal/config"
-	"github.com/ishikawaryoufutoshi/spanlidate/internal/spanner"
+	"github.com/nu0ma/spalidate/internal/config"
+	"github.com/nu0ma/spalidate/internal/spanner"
 )
 
 type Validator struct {

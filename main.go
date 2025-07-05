@@ -6,9 +6,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/ishikawaryoufutoshi/spanlidate/internal/config"
-	"github.com/ishikawaryoufutoshi/spanlidate/internal/spanner"
-	"github.com/ishikawaryoufutoshi/spanlidate/internal/validator"
+	"github.com/nu0ma/spalidate/internal/config"
+	"github.com/nu0ma/spalidate/internal/spanner"
+	"github.com/nu0ma/spalidate/internal/validator"
 )
 
 const version = "v1.0.0"
@@ -23,7 +23,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("spanlidate %s\n", version)
+		fmt.Printf("spalidate %s\n", version)
 		return
 	}
 
@@ -41,7 +41,7 @@ func main() {
 
 	if *verbose {
 		log.SetFlags(log.LstdFlags | log.Lshortfile)
-		log.Println("Starting spanlidate validation")
+		log.Println("Starting spalidate validation")
 	}
 
 	cfg, err := config.LoadConfig(*configPath)
