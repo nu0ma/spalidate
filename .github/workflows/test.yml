@@ -83,7 +83,7 @@ jobs:
         SPANNER_EMULATOR_HOST: localhost:9010
       run: |
         echo "Loading test data..."
-        spemu --project test-project --instance test-instance --database test-database testdata/seed.sql --verbose
+        spemu --project test-project --instance test-instance --database test-database --verbose testdata/seed.sql
     
     - name: Run integration tests
       env:
