@@ -17,9 +17,9 @@ type Row map[string]interface{}
 
 func NewClient(projectID string) (*Client, error) {
 	ctx := context.Background()
-	
+
 	database := fmt.Sprintf("projects/%s/instances/test-instance/databases/test-db", projectID)
-	
+
 	client, err := spanner.NewClient(ctx, database)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Spanner client: %w", err)
@@ -37,10 +37,10 @@ func (c *Client) Close() {
 
 func (c *Client) CountRows(tableName string) (int, error) {
 	ctx := context.Background()
-	
+
 	query := fmt.Sprintf("SELECT COUNT(*) as count FROM %s", tableName)
 	stmt := spanner.Statement{SQL: query}
-	
+
 	iter := c.client.Single().Query(ctx, stmt)
 	defer iter.Stop()
 
@@ -59,7 +59,7 @@ func (c *Client) CountRows(tableName string) (int, error) {
 
 func (c *Client) QueryRows(tableName string, columns []string) ([]Row, error) {
 	ctx := context.Background()
-	
+
 	columnList := "*"
 	if len(columns) > 0 {
 		columnList = ""
@@ -73,7 +73,7 @@ func (c *Client) QueryRows(tableName string, columns []string) ([]Row, error) {
 
 	query := fmt.Sprintf("SELECT %s FROM %s", columnList, tableName)
 	stmt := spanner.Statement{SQL: query}
-	
+
 	iter := c.client.Single().Query(ctx, stmt)
 	defer iter.Stop()
 
@@ -91,7 +91,7 @@ func (c *Client) QueryRows(tableName string, columns []string) ([]Row, error) {
 		columnNames := row.ColumnNames()
 		values := make([]interface{}, len(columnNames))
 		pointers := make([]interface{}, len(columnNames))
-		
+
 		for i := range values {
 			pointers[i] = &values[i]
 		}
@@ -112,20 +112,20 @@ func (c *Client) QueryRows(tableName string, columns []string) ([]Row, error) {
 
 func (c *Client) TableExists(tableName string) (bool, error) {
 	ctx := context.Background()
-	
+
 	query := `
 		SELECT COUNT(*) as count 
 		FROM INFORMATION_SCHEMA.TABLES 
 		WHERE TABLE_NAME = @tableName
 	`
-	
+
 	stmt := spanner.Statement{
 		SQL: query,
 		Params: map[string]interface{}{
 			"tableName": tableName,
 		},
 	}
-	
+
 	iter := c.client.Single().Query(ctx, stmt)
 	defer iter.Stop()
 
