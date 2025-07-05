@@ -16,7 +16,7 @@ test-integration: setup-integration
 # Setup integration test environment
 setup-integration:
 	@echo "Setting up integration test environment..."
-	cd testdata && docker-compose up -d
+	cd testdata && docker compose up -d
 	@echo "Waiting for Spanner emulator to be ready..."
 	timeout 60 bash -c 'until nc -z localhost 9010; do sleep 1; done'
 	@echo "Waiting additional time for full readiness..."
@@ -37,7 +37,7 @@ setup-integration:
 # Cleanup integration test environment
 cleanup-integration:
 	@echo "Cleaning up integration test environment..."
-	cd testdata && docker-compose down -v
+	cd testdata && docker compose down -v
 	docker system prune -f
 
 # Build the application
