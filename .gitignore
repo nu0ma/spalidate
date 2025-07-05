@@ -41,7 +41,7 @@ Thumbs.db
 *.log
 
 # Build artifacts
-/spanlidate
+/spalidate
 /dist/
 /build/
 
@@ -62,6 +62,6 @@ validation.yaml
 # Goreleaser artifacts
 dist/
 
-spanlidate
+spalidate
 
 .claude/settings.local.json
