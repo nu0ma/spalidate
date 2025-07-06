@@ -3,9 +3,12 @@ package spanner
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"cloud.google.com/go/civil"
 	"cloud.google.com/go/spanner"
 	"google.golang.org/api/iterator"
+	sppb "google.golang.org/genproto/googleapis/spanner/v1"
 )
 
 type Client struct {
@@ -96,19 +99,64 @@ func (c *Client) QueryRowsWithOrder(tableName string, columns []string, orderBy 
 
 		rowData := make(Row)
 		columnNames := row.ColumnNames()
-		values := make([]interface{}, len(columnNames))
-		pointers := make([]interface{}, len(columnNames))
-
-		for i := range values {
-			pointers[i] = &values[i]
-		}
-
-		if err := row.Columns(pointers...); err != nil {
-			return nil, fmt.Errorf("failed to scan row: %w", err)
-		}
-
-		for i, name := range columnNames {
-			rowData[name] = values[i]
+		
+		// Use GenericColumnValue for proper type handling
+		for i := 0; i < row.Size(); i++ {
+			var col spanner.GenericColumnValue
+			if err := row.Column(i, &col); err != nil {
+				return nil, fmt.Errorf("failed to read column %d: %w", i, err)
+			}
+			
+			// GenericColumnValue handles NULL internally during Decode
+			
+			// Decode based on the actual type
+			switch col.Type.Code {
+			case sppb.TypeCode_INT64:
+				var v int64
+				if err := col.Decode(&v); err != nil {
+					return nil, fmt.Errorf("failed to decode int64: %w", err)
+				}
+				rowData[columnNames[i]] = v
+			case sppb.TypeCode_STRING:
+				var v string
+				if err := col.Decode(&v); err != nil {
+					return nil, fmt.Errorf("failed to decode string: %w", err)
+				}
+				rowData[columnNames[i]] = v
+			case sppb.TypeCode_FLOAT64:
+				var v float64
+				if err := col.Decode(&v); err != nil {
+					return nil, fmt.Errorf("failed to decode float64: %w", err)
+				}
+				rowData[columnNames[i]] = v
+			case sppb.TypeCode_BOOL:
+				var v bool
+				if err := col.Decode(&v); err != nil {
+					return nil, fmt.Errorf("failed to decode bool: %w", err)
+				}
+				rowData[columnNames[i]] = v
+			case sppb.TypeCode_BYTES:
+				var v []byte
+				if err := col.Decode(&v); err != nil {
+					return nil, fmt.Errorf("failed to decode bytes: %w", err)
+				}
+				rowData[columnNames[i]] = v
+			case sppb.TypeCode_TIMESTAMP:
+				var v time.Time
+				if err := col.Decode(&v); err != nil {
+					return nil, fmt.Errorf("failed to decode timestamp: %w", err)
+				}
+				rowData[columnNames[i]] = v
+			case sppb.TypeCode_DATE:
+				var v civil.Date
+				if err := col.Decode(&v); err != nil {
+					return nil, fmt.Errorf("failed to decode date: %w", err)
+				}
+				rowData[columnNames[i]] = v
+			default:
+				// For unknown types, store the raw value
+				rowData[columnNames[i]] = col.Value
+			}
 		}
 
 		rows = append(rows, rowData)
