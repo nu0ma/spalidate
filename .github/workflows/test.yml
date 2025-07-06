@@ -91,6 +91,11 @@ jobs:
       run: |
         pwd
         ls -la testdata/
+        # Ensure validation.yaml exists for integration test
+        if [ ! -f testdata/validation.yaml ]; then
+          echo "Creating missing validation.yaml"
+          cp testdata/validation.yaml.example testdata/validation.yaml 2>/dev/null || echo "Warning: validation.yaml not found"
+        fi
         go test -v -tags=integration .
     
     - name: Cleanup

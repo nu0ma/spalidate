@@ -56,8 +56,10 @@ coverage.html
 
 # Config files with sensitive data
 config.yaml
-validation.yaml
 *.secret.yaml
+
+# Exception: Allow test validation files
+!testdata/validation.yaml
 
 # Goreleaser artifacts
 dist/

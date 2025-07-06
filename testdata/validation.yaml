@@ -1,0 +1,31 @@
+tables:
+  # Users table validation with order_by to ensure consistent results
+  Users:
+    count: 3
+    order_by: "UserID"
+    columns:
+      UserID: "user-001"
+      Name: "Alice Johnson"
+      Email: "alice@example.com"
+      Status: 1
+  
+  # Products table validation with order_by
+  Products:
+    count: 3
+    order_by: "ProductID"
+    columns:
+      ProductID: "prod-001"
+      Name: "Laptop Computer"
+      Price: 150000
+      IsActive: true
+      CategoryID: "cat-electronics"
+  
+  # Orders table validation (interleaved table)
+  Orders:
+    count: 3
+    order_by: "OrderID"
+    columns:
+      OrderID: "order-001"
+      UserID: "user-001"
+      ProductID: "prod-001"
+      Quantity: 1
