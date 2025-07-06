@@ -12,9 +12,10 @@ type Config struct {
 }
 
 type TableConfig struct {
-	Count   int                    `yaml:"count"`
-	OrderBy string                 `yaml:"order_by,omitempty"`
-	Columns map[string]interface{} `yaml:"columns"`
+	Count   int                      `yaml:"count"`
+	OrderBy string                   `yaml:"order_by,omitempty"`
+	Columns map[string]interface{}   `yaml:"columns,omitempty"`
+	Rows    []map[string]interface{} `yaml:"rows,omitempty"`
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -49,8 +50,8 @@ func validateConfig(config *Config) error {
 			return fmt.Errorf("table %s: count cannot be negative", tableName)
 		}
 
-		if len(tableConfig.Columns) == 0 && tableConfig.Count > 0 {
-			return fmt.Errorf("table %s: expected %d rows but no columns defined", tableName, tableConfig.Count)
+		if len(tableConfig.Columns) == 0 && len(tableConfig.Rows) == 0 && tableConfig.Count > 0 {
+			return fmt.Errorf("table %s: expected %d rows but no columns or rows defined", tableName, tableConfig.Count)
 		}
 	}
 
@@ -66,9 +67,17 @@ func (c *Config) GetTableNames() []string {
 }
 
 func (t *TableConfig) GetColumnNames() []string {
-	names := make([]string, 0, len(t.Columns))
-	for name := range t.Columns {
-		names = append(names, name)
+	var names []string
+	if len(t.Columns) > 0 {
+		names = make([]string, 0, len(t.Columns))
+		for name := range t.Columns {
+			names = append(names, name)
+		}
+	} else if len(t.Rows) > 0 {
+		names = make([]string, 0, len(t.Rows[0]))
+		for name := range t.Rows[0] {
+			names = append(names, name)
+		}
 	}
 	return names
 }
