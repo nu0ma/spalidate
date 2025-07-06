@@ -30,7 +30,7 @@ setup-integration:
 	@echo "Initializing database schema..."
 	SPANNER_EMULATOR_HOST=localhost:9010 spemu --project test-project --instance test-instance --database test-database --init-schema testdata/schema.sql --verbose
 	@echo "Loading test data..."
-	SPANNER_EMULATOR_HOST=localhost:9010 spemu --project test-project --instance test-instance --database test-database testdata/seed.sql --verbose
+	SPANNER_EMULATOR_HOST=localhost:9010 spemu --project test-project --instance test-instance --database test-database --verbose testdata/seed.sql
 	@echo "Setup complete!"
 
 # Cleanup integration test environment
