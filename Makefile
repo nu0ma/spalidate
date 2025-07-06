@@ -19,13 +19,16 @@ test-integration: install-spemu setup-integration
 
 # Setup integration test environment
 setup-integration:
+	@echo "Stopping any running Spanner emulator..."
+	@$(MAKE) cleanup-integration
+
 	@echo "Setting up integration test environment..."
 	@echo "Starting Spanner emulator..."
 	docker run -d --name spanner-emulator \
 		-p 9010:9010 -p 9020:9020 \
 		gcr.io/cloud-spanner-emulator/emulator:1.5.6
 	@echo "Waiting for Spanner emulator to be ready..."
-	timeout 60 bash -c 'until nc -z localhost 9010; do sleep 1; done'
+	@bash -c 'for i in {1..60}; do nc -z localhost 9010 && exit 0 || sleep 1; done; exit 1'
 	@echo "Spanner emulator is ready!"
 	@echo "Initializing database schema..."
 	SPANNER_EMULATOR_HOST=localhost:9010 spemu --project test-project --instance test-instance --database test-database --init-schema testdata/schema.sql --verbose
