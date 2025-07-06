@@ -99,16 +99,16 @@ func (c *Client) QueryRowsWithOrder(tableName string, columns []string, orderBy 
 
 		rowData := make(Row)
 		columnNames := row.ColumnNames()
-		
+
 		// Use GenericColumnValue for proper type handling
 		for i := 0; i < row.Size(); i++ {
 			var col spanner.GenericColumnValue
 			if err := row.Column(i, &col); err != nil {
 				return nil, fmt.Errorf("failed to read column %d: %w", i, err)
 			}
-			
+
 			// GenericColumnValue handles NULL internally during Decode
-			
+
 			// Decode based on the actual type
 			switch col.Type.Code {
 			case sppb.TypeCode_INT64:

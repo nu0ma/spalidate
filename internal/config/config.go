@@ -12,10 +12,11 @@ type Config struct {
 }
 
 type TableConfig struct {
-	Count   int                      `yaml:"count"`
-	OrderBy string                   `yaml:"order_by,omitempty"`
-	Columns map[string]interface{}   `yaml:"columns,omitempty"`
-	Rows    []map[string]interface{} `yaml:"rows,omitempty"`
+	Count             int                      `yaml:"count"`
+	OrderBy           string                   `yaml:"order_by,omitempty"`
+	PrimaryKeyColumns []string                 `yaml:"primary_key_columns,omitempty"`
+	Columns           map[string]interface{}   `yaml:"columns,omitempty"`
+	Rows              []map[string]interface{} `yaml:"rows,omitempty"`
 }
 
 func LoadConfig(path string) (*Config, error) {
