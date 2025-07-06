@@ -7,8 +7,8 @@ on:
     branches: [ main, master ]
 
 jobs:
-  unit-tests:
-    name: Unit Tests
+  test:
+    name: Test
     runs-on: ubuntu-latest
     
     steps:
@@ -19,87 +19,5 @@ jobs:
       with:
         go-version: '1.24'
     
-    - name: Cache Go modules
-      uses: actions/cache@v3
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-${{ github.run_number }}
-        restore-keys: |
-          ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-
-    
-    - name: Download dependencies
-      run: go mod download
-    
-    - name: Run unit tests
-      run: go test -v ./internal/...
-    
-    - name: Build application
-      run: go build -v ./...
-
-  integration-tests:
-    name: Integration Tests
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.24'
-    
-    - name: Cache Go modules
-      uses: actions/cache@v3
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-${{ github.run_number }}
-        restore-keys: |
-          ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}-
-    
-    - name: Download dependencies
-      run: go mod download
-    
-    - name: Install spemu
-      run: go install github.com/nu0ma/spemu@latest
-    
-    - name: Start Spanner Emulator
-      run: |
-        docker run -d --name spanner-emulator \
-          -p 9010:9010 -p 9020:9020 \
-          gcr.io/cloud-spanner-emulator/emulator:1.5.6
-        echo "Waiting for Spanner emulator to be ready..."
-        timeout 60 bash -c 'until nc -z localhost 9010; do sleep 1; done'
-        echo "Spanner emulator is ready!"
-    
-    - name: Initialize schema with spemu
-      env:
-        SPANNER_EMULATOR_HOST: localhost:9010
-      run: |
-        echo "Initializing database schema..."
-        spemu --project test-project --instance test-instance --database test-database --init-schema testdata/schema.sql --verbose
-    
-    - name: Load test data with spemu
-      env:
-        SPANNER_EMULATOR_HOST: localhost:9010
-      run: |
-        echo "Loading test data..."
-        spemu --project test-project --instance test-instance --database test-database --verbose testdata/seed.sql
-    
-    - name: Run integration tests
-      env:
-        SPANNER_EMULATOR_HOST: localhost:9010
-      run: |
-        pwd
-        ls -la testdata/
-        # Ensure validation.yaml exists for integration test
-        if [ ! -f testdata/validation.yaml ]; then
-          echo "Creating missing validation.yaml"
-          cp testdata/validation.yaml.example testdata/validation.yaml 2>/dev/null || echo "Warning: validation.yaml not found"
-        fi
-        go test -v -tags=integration .
-    
-    - name: Cleanup
-      if: always()
-      run: |
-        docker stop spanner-emulator || true
-        docker rm spanner-emulator || true
+    - name: Run all tests
+      run: make test-integration
