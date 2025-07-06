@@ -3,9 +3,7 @@ package spanner
 import (
 	"context"
 	"fmt"
-	"time"
 
-	"cloud.google.com/go/civil"
 	"cloud.google.com/go/spanner"
 	"google.golang.org/api/iterator"
 	sppb "google.golang.org/genproto/googleapis/spanner/v1"
@@ -112,47 +110,138 @@ func (c *Client) QueryRowsWithOrder(tableName string, columns []string, orderBy 
 			// Decode based on the actual type
 			switch col.Type.Code {
 			case sppb.TypeCode_INT64:
-				var v int64
+				var v spanner.NullInt64
 				if err := col.Decode(&v); err != nil {
 					return nil, fmt.Errorf("failed to decode int64: %w", err)
 				}
-				rowData[columnNames[i]] = v
+				if v.Valid {
+					rowData[columnNames[i]] = v.Int64
+				} else {
+					rowData[columnNames[i]] = nil
+				}
 			case sppb.TypeCode_STRING:
-				var v string
+				var v spanner.NullString
 				if err := col.Decode(&v); err != nil {
 					return nil, fmt.Errorf("failed to decode string: %w", err)
 				}
-				rowData[columnNames[i]] = v
+				if v.Valid {
+					rowData[columnNames[i]] = v.StringVal
+				} else {
+					rowData[columnNames[i]] = nil
+				}
 			case sppb.TypeCode_FLOAT64:
-				var v float64
+				var v spanner.NullFloat64
 				if err := col.Decode(&v); err != nil {
 					return nil, fmt.Errorf("failed to decode float64: %w", err)
 				}
-				rowData[columnNames[i]] = v
+				if v.Valid {
+					rowData[columnNames[i]] = v.Float64
+				} else {
+					rowData[columnNames[i]] = nil
+				}
 			case sppb.TypeCode_BOOL:
-				var v bool
+				var v spanner.NullBool
 				if err := col.Decode(&v); err != nil {
 					return nil, fmt.Errorf("failed to decode bool: %w", err)
 				}
-				rowData[columnNames[i]] = v
+				if v.Valid {
+					rowData[columnNames[i]] = v.Bool
+				} else {
+					rowData[columnNames[i]] = nil
+				}
 			case sppb.TypeCode_BYTES:
 				var v []byte
 				if err := col.Decode(&v); err != nil {
 					return nil, fmt.Errorf("failed to decode bytes: %w", err)
 				}
-				rowData[columnNames[i]] = v
+				if v == nil {
+					rowData[columnNames[i]] = nil
+				} else {
+					rowData[columnNames[i]] = v
+				}
 			case sppb.TypeCode_TIMESTAMP:
-				var v time.Time
+				var v spanner.NullTime
 				if err := col.Decode(&v); err != nil {
 					return nil, fmt.Errorf("failed to decode timestamp: %w", err)
 				}
-				rowData[columnNames[i]] = v
+				if v.Valid {
+					rowData[columnNames[i]] = v.Time
+				} else {
+					rowData[columnNames[i]] = nil
+				}
 			case sppb.TypeCode_DATE:
-				var v civil.Date
+				var v spanner.NullDate
 				if err := col.Decode(&v); err != nil {
 					return nil, fmt.Errorf("failed to decode date: %w", err)
 				}
-				rowData[columnNames[i]] = v
+				if v.Valid {
+					rowData[columnNames[i]] = v.Date
+				} else {
+					rowData[columnNames[i]] = nil
+				}
+			case sppb.TypeCode_NUMERIC:
+				var v spanner.NullNumeric
+				if err := col.Decode(&v); err != nil {
+					return nil, fmt.Errorf("failed to decode numeric: %w", err)
+				}
+				if v.Valid {
+					rowData[columnNames[i]] = v.Numeric
+				} else {
+					rowData[columnNames[i]] = nil
+				}
+			case sppb.TypeCode_JSON:
+				var v spanner.NullJSON
+				if err := col.Decode(&v); err != nil {
+					return nil, fmt.Errorf("failed to decode json: %w", err)
+				}
+				if v.Valid {
+					rowData[columnNames[i]] = v.Value
+				} else {
+					rowData[columnNames[i]] = nil
+				}
+			case sppb.TypeCode_ARRAY:
+				// Handle arrays based on element type
+				if col.Type.ArrayElementType != nil {
+					switch col.Type.ArrayElementType.Code {
+					case sppb.TypeCode_STRING:
+						var v []spanner.NullString
+						if err := col.Decode(&v); err != nil {
+							return nil, fmt.Errorf("failed to decode string array: %w", err)
+						}
+						result := make([]string, len(v))
+						for i, s := range v {
+							if s.Valid {
+								result[i] = s.StringVal
+							}
+						}
+						rowData[columnNames[i]] = result
+					case sppb.TypeCode_INT64:
+						var v []spanner.NullInt64
+						if err := col.Decode(&v); err != nil {
+							return nil, fmt.Errorf("failed to decode int64 array: %w", err)
+						}
+						result := make([]int64, len(v))
+						for i, n := range v {
+							if n.Valid {
+								result[i] = n.Int64
+							}
+						}
+						rowData[columnNames[i]] = result
+					default:
+						// For other array types, try generic decoding
+						var v interface{}
+						if err := col.Decode(&v); err != nil {
+							return nil, fmt.Errorf("failed to decode array: %w", err)
+						}
+						rowData[columnNames[i]] = v
+					}
+				} else {
+					var v interface{}
+					if err := col.Decode(&v); err != nil {
+						return nil, fmt.Errorf("failed to decode array: %w", err)
+					}
+					rowData[columnNames[i]] = v
+				}
 			default:
 				// For unknown types, store the raw value
 				rowData[columnNames[i]] = col.Value

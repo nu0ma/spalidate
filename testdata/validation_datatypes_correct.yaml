@@ -1,0 +1,47 @@
+tables:
+  # Test data types with actual data in database
+  DataTypeTest:
+    count: 3
+    order_by: "ID"
+    rows:
+      # Row 1: dtype-001 - all non-null values
+      - ID: "dtype-001"
+        StringCol: "Hello World"
+        Int64Col: 42
+        # NumericCol: 123.456  # Skip NUMERIC for now
+        Float64Col: 3.14159
+        BoolCol: true
+        # BytesCol: base64 encoded 'binary data'
+        # TimestampCol: "2024-01-15T10:30:00Z"
+        # DateCol: "2024-01-15"
+        ArrayStringCol: ["apple", "banana", "cherry"]
+        ArrayInt64Col: [1, 2, 3]
+        # JSONCol: '{"key": "value", "number": 123}'
+      
+      # Row 2: dtype-002 - some null values (Int64Col and BytesCol are NULL)
+      - ID: "dtype-002"
+        StringCol: "Test String"
+        # Int64Col is NULL - skip validation
+        # NumericCol: 999.999  # Skip NUMERIC for now
+        Float64Col: 2.71828
+        BoolCol: false
+        # BytesCol is NULL - skip validation
+        # TimestampCol: "2024-02-20T15:45:00Z"
+        # DateCol: "2024-02-20"
+        ArrayStringCol: ["single"]
+        ArrayInt64Col: []
+        # JSONCol: '{"empty": null}'
+      
+      # Row 3: dtype-003 - Unicode and special characters
+      - ID: "dtype-003"
+        StringCol: "日本語テスト 🚀"
+        Int64Col: -9999
+        # NumericCol: -0.001  # Skip NUMERIC for now
+        Float64Col: -1.0
+        BoolCol: true
+        # BytesCol: base64 encoded '\x00\xFF\xFE'
+        # TimestampCol: "2024-03-25T23:59:59.999999Z"
+        # DateCol: "2024-03-25"
+        ArrayStringCol: ["multi", "line\nstring", "tab\there"]
+        ArrayInt64Col: [-1, 0, 1]
+        # JSONCol: '{"unicode": "こんにちは"}'

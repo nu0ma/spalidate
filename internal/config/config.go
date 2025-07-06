@@ -50,9 +50,8 @@ func validateConfig(config *Config) error {
 			return fmt.Errorf("table %s: count cannot be negative", tableName)
 		}
 
-		if len(tableConfig.Columns) == 0 && len(tableConfig.Rows) == 0 && tableConfig.Count > 0 {
-			return fmt.Errorf("table %s: expected %d rows but no columns or rows defined", tableName, tableConfig.Count)
-		}
+		// Allow count-only validation (no columns or rows defined)
+		// This is valid for scenarios where we only want to check row count
 	}
 
 	return nil
@@ -67,17 +66,25 @@ func (c *Config) GetTableNames() []string {
 }
 
 func (t *TableConfig) GetColumnNames() []string {
-	var names []string
+	nameSet := make(map[string]bool)
+	
 	if len(t.Columns) > 0 {
-		names = make([]string, 0, len(t.Columns))
 		for name := range t.Columns {
-			names = append(names, name)
+			nameSet[name] = true
 		}
 	} else if len(t.Rows) > 0 {
-		names = make([]string, 0, len(t.Rows[0]))
-		for name := range t.Rows[0] {
-			names = append(names, name)
+		// Collect column names from all rows, not just the first one
+		for _, row := range t.Rows {
+			for name := range row {
+				nameSet[name] = true
+			}
 		}
+	}
+	
+	// Convert map keys to slice
+	names := make([]string, 0, len(nameSet))
+	for name := range nameSet {
+		names = append(names, name)
 	}
 	return names
 }

@@ -1,0 +1,33 @@
+tables:
+  # Test empty table validation
+  EmptyTable:
+    count: 0
+  
+  # Test partial column validation (only validate specific columns)
+  Users:
+    count: 3
+    order_by: "UserID"
+    rows:
+      # Only validate UserID and Name, ignore other columns
+      - UserID: "user-001"
+        Name: "Alice Johnson"
+      - UserID: "user-002"
+        Name: "Bob Smith"
+      - UserID: "user-003"
+        Name: "Charlie Brown"
+  
+  # Test without order_by (results might vary)
+  Products:
+    count: 3
+    # No order_by specified - test should handle unstable ordering
+    
+  # Test single row validation for interleaved table
+  Orders:
+    count: 3
+    order_by: "OrderID"
+    rows:
+      # Only validate the first order
+      - OrderID: "order-001"
+        UserID: "user-001"
+        ProductID: "prod-001"
+        Quantity: 1

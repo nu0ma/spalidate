@@ -1,0 +1,36 @@
+# This file contains various error scenarios for testing
+
+# Invalid YAML will be created dynamically in tests
+# Here we store valid YAML with wrong expectations
+
+tables:
+  # Non-existent table
+  NonExistentTable:
+    count: 0
+    
+  # Wrong column name
+  Users:
+    count: 3
+    order_by: "UserID"
+    rows:
+      - UserID: "user-001"
+        WrongColumnName: "This column doesn't exist"
+        
+  # Type mismatch - expecting string for int column
+  Products:
+    count: 3
+    order_by: "ProductID"
+    rows:
+      - ProductID: "prod-001"
+        Name: "Laptop Computer"
+        Price: "not a number"  # Price is INT64, this will fail
+        
+  # Multiple errors in one validation
+  DataTypeTest:
+    count: 10  # Wrong count (actual is 3)
+    order_by: "ID"
+    rows:
+      - ID: "wrong-id"  # Wrong ID
+        StringCol: 123  # Wrong type
+        Int64Col: "not an int"  # Wrong type
+        BoolCol: "not a bool"  # Wrong type
