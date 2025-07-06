@@ -69,7 +69,7 @@ func (v *Validator) validateTable(tableName string, tableConfig config.TableConf
 		result.AddMessage(fmt.Sprintf("Table %s: row count matches (%d)", tableName, actualCount))
 	}
 
-	if tableConfig.Count > 0 && len(tableConfig.Columns) > 0 {
+	if tableConfig.Count > 0 && (len(tableConfig.Columns) > 0 || len(tableConfig.Rows) > 0) {
 		if err := v.validateColumns(tableName, tableConfig, result); err != nil {
 			return fmt.Errorf("failed to validate columns: %w", err)
 		}
@@ -80,7 +80,7 @@ func (v *Validator) validateTable(tableName string, tableConfig config.TableConf
 
 func (v *Validator) validateColumns(tableName string, tableConfig config.TableConfig, result *ValidationResult) error {
 	columnNames := tableConfig.GetColumnNames()
-	rows, err := v.client.QueryRows(tableName, columnNames)
+	rows, err := v.client.QueryRowsWithOrder(tableName, columnNames, tableConfig.OrderBy)
 	if err != nil {
 		return fmt.Errorf("failed to query rows: %w", err)
 	}
@@ -92,6 +92,12 @@ func (v *Validator) validateColumns(tableName string, tableConfig config.TableCo
 		return nil
 	}
 
+	// Handle multi-row validation
+	if len(tableConfig.Rows) > 0 {
+		return v.validateMultipleRows(tableName, tableConfig, rows, result)
+	}
+
+	// Legacy single-row validation
 	expectedRow := tableConfig.Columns
 	actualRow := rows[0]
 
@@ -107,6 +113,33 @@ func (v *Validator) validateColumns(tableName string, tableConfig config.TableCo
 				tableName, columnName, expectedValue, expectedValue, actualValue, actualValue))
 		} else {
 			result.AddMessage(fmt.Sprintf("Table %s, column %s: value matches", tableName, columnName))
+		}
+	}
+
+	return nil
+}
+
+func (v *Validator) validateMultipleRows(tableName string, tableConfig config.TableConfig, rows []spanner.Row, result *ValidationResult) error {
+	for i, expectedRow := range tableConfig.Rows {
+		if i >= len(rows) {
+			result.AddError(fmt.Sprintf("Table %s: expected row %d but only %d rows found", tableName, i+1, len(rows)))
+			continue
+		}
+
+		actualRow := rows[i]
+		for columnName, expectedValue := range expectedRow {
+			actualValue, exists := actualRow[columnName]
+			if !exists {
+				result.AddError(fmt.Sprintf("Table %s row %d: column %s not found", tableName, i+1, columnName))
+				continue
+			}
+
+			if !v.compareValues(expectedValue, actualValue) {
+				result.AddError(fmt.Sprintf("Table %s row %d, column %s: expected %v (%T), got %v (%T)",
+					tableName, i+1, columnName, expectedValue, expectedValue, actualValue, actualValue))
+			} else {
+				result.AddMessage(fmt.Sprintf("Table %s row %d, column %s: value matches", tableName, i+1, columnName))
+			}
 		}
 	}
 
