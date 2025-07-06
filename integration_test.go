@@ -4,10 +4,14 @@
 package main
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"testing"
 	"time"
+
+	"cloud.google.com/go/spanner"
+	"github.com/nu0ma/spalidate/internal/testutil"
 )
 
 const (
@@ -25,6 +29,12 @@ func TestIntegrationSpalidate(t *testing.T) {
 	// Wait for Spanner emulator to be ready
 	if err := waitForSpannerEmulator(); err != nil {
 		t.Fatalf("Spanner emulator is not ready: %v", err)
+	}
+
+	// Setup test database with fixtures
+	ctx := context.Background()
+	if err := setupTestDatabase(ctx, t); err != nil {
+		t.Fatalf("Failed to setup test database: %v", err)
 	}
 
 	// Build the spalidate binary
@@ -355,4 +365,24 @@ func findSubstring(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+// setupTestDatabase creates the test database schema and loads fixtures
+func setupTestDatabase(ctx context.Context, t *testing.T) error {
+	// Create Spanner client
+	client, err := spanner.NewClient(ctx, "projects/"+testProject+"/instances/"+testInstance+"/databases/"+testDatabase)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	// Create fixture helper
+	fixtureHelper := testutil.NewFixtureHelper(client, testDatabase)
+
+	// Load fixtures
+	if err := fixtureHelper.LoadFixtures(ctx); err != nil {
+		return err
+	}
+
+	return nil
 }

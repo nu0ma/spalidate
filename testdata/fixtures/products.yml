@@ -1,0 +1,20 @@
+- ProductID: prod-001
+  Name: Laptop Computer
+  Price: 150000
+  IsActive: true
+  CategoryID: cat-electronics
+  CreatedAt: 2024-01-01T00:00:00Z
+
+- ProductID: prod-002
+  Name: Wireless Mouse
+  Price: 3000
+  IsActive: true
+  CategoryID: cat-electronics
+  CreatedAt: 2024-01-01T00:00:00Z
+
+- ProductID: prod-003
+  Name: Coffee Mug
+  Price: 1200
+  IsActive: false
+  CategoryID: cat-kitchen
+  CreatedAt: 2024-01-01T00:00:00Z

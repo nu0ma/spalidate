@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-integration setup-integration cleanup-integration build install-spemu
+.PHONY: test test-unit test-integration setup-integration cleanup-integration build
 
 # Default target
 test: test-unit test-integration
@@ -7,12 +7,8 @@ test: test-unit test-integration
 test-unit:
 	go test ./internal/...
 
-# Install spemu tool
-install-spemu:
-	go install github.com/nu0ma/spemu@latest
-
 # Integration tests
-test-integration: install-spemu setup-integration
+test-integration: setup-integration
 	@echo "Running integration tests..."
 	SPANNER_EMULATOR_HOST=localhost:9010 go test -v -tags=integration ./integration_test.go
 	@$(MAKE) cleanup-integration
@@ -30,10 +26,9 @@ setup-integration:
 	@echo "Waiting for Spanner emulator to be ready..."
 	@bash -c 'for i in {1..60}; do nc -z localhost 9010 && exit 0 || sleep 1; done; exit 1'
 	@echo "Spanner emulator is ready!"
-	@echo "Initializing database schema..."
-	SPANNER_EMULATOR_HOST=localhost:9010 spemu --project test-project --instance test-instance --database test-database --init-schema testdata/schema.sql --verbose
-	@echo "Loading test data..."
-	SPANNER_EMULATOR_HOST=localhost:9010 spemu --project test-project --instance test-instance --database test-database --verbose testdata/seed.sql
+	@echo "Creating database schema..."
+	SPANNER_EMULATOR_HOST=localhost:9010 gcloud spanner databases create test-database --instance=test-instance --project=test-project --ddl="CREATE TABLE Users (UserID STRING(36) NOT NULL, Name STRING(100) NOT NULL, Email STRING(255) NOT NULL, Status INT64 NOT NULL, CreatedAt TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true)) PRIMARY KEY (UserID); CREATE TABLE Products (ProductID STRING(36) NOT NULL, Name STRING(200) NOT NULL, Price INT64 NOT NULL, IsActive BOOL NOT NULL, CategoryID STRING(36), CreatedAt TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true)) PRIMARY KEY (ProductID); CREATE TABLE Orders (OrderID STRING(36) NOT NULL, UserID STRING(36) NOT NULL, ProductID STRING(36) NOT NULL, Quantity INT64 NOT NULL, OrderDate TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true)) PRIMARY KEY (UserID, ProductID), INTERLEAVE IN PARENT Users ON DELETE CASCADE;" || true
+	@echo "Database schema created (fixtures will be loaded by tests)"
 	@echo "Setup complete!"
 
 # Cleanup integration test environment
@@ -64,7 +59,6 @@ help:
 	@echo "  test-unit         - Run unit tests only"  
 	@echo "  test-integration  - Run integration tests with Spanner emulator"
 	@echo "  build             - Build the application binary"
-	@echo "  install-spemu     - Install spemu tool for Spanner operations"
 	@echo "  setup-integration - Set up Spanner emulator for testing"
 	@echo "  cleanup-integration - Clean up Spanner emulator"
 	@echo "  deps              - Download and tidy Go dependencies"
