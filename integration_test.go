@@ -80,7 +80,7 @@ func TestIntegrationSpalidate(t *testing.T) {
       UserID: "user-001"
       Name: "Alice Johnson"
 `
-		
+
 		wrongValidationFile := "testdata/validation_wrong.yaml"
 		if err := os.WriteFile(wrongValidationFile, []byte(wrongValidationContent), 0644); err != nil {
 			t.Fatalf("Failed to create wrong validation file: %v", err)
@@ -123,7 +123,7 @@ func TestIntegrationSpalidate(t *testing.T) {
         Email: "wrong@example.com"  # Should be "alice@example.com"
         Status: 2  # Should be 1
 `
-		
+
 		wrongColumnsFile := "testdata/validation_wrong_columns.yaml"
 		if err := os.WriteFile(wrongColumnsFile, []byte(wrongColumnsContent), 0644); err != nil {
 			t.Fatalf("Failed to create wrong columns validation file: %v", err)
@@ -154,6 +154,147 @@ func TestIntegrationSpalidate(t *testing.T) {
 		}
 	})
 
+	// Test primary key-based comparison
+	t.Run("PrimaryKeyBasedComparison", func(t *testing.T) {
+		// Create a validation file that uses primary key columns for order-independent comparison
+		primaryKeyContent := `tables:
+  Users:
+    count: 3
+    primary_key_columns: ["UserID"]
+    rows:
+      - UserID: "user-003"  # Different order than database
+        Name: "Charlie Brown"
+        Email: "charlie@example.com"
+        Status: 1
+      - UserID: "user-001"
+        Name: "Alice Johnson"
+        Email: "alice@example.com"
+        Status: 1
+      - UserID: "user-002"
+        Name: "Bob Smith"
+        Email: "bob@example.com"
+        Status: 2
+`
+
+		primaryKeyFile := "testdata/validation_primary_key.yaml"
+		if err := os.WriteFile(primaryKeyFile, []byte(primaryKeyContent), 0644); err != nil {
+			t.Fatalf("Failed to create primary key validation file: %v", err)
+		}
+		defer os.Remove(primaryKeyFile)
+
+		cmd := exec.Command("./spalidate-test",
+			"--project", testProject,
+			"--instance", testInstance,
+			"--database", testDatabase,
+			"--port", "9010",
+			"--verbose",
+			primaryKeyFile,
+		)
+
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("spalidate command failed: %v\nOutput: %s", err, string(output))
+		}
+
+		outputStr := string(output)
+		if !contains(outputStr, "✅ All validations passed!") {
+			t.Errorf("Expected successful validation message, got: %s", outputStr)
+		}
+	})
+
+	// Test numeric tolerance feature
+	t.Run("NumericToleranceComparison", func(t *testing.T) {
+		// Create a validation file that tests numeric tolerance
+		toleranceContent := `tables:
+  Products:
+    count: 3
+    order_by: "ProductID"
+    rows:
+      - ProductID: "prod-001"
+        Name: "Laptop Computer"
+        Price: 150000  # Exact match
+        IsActive: true
+      - ProductID: "prod-002"
+        Name: "Wireless Mouse"
+        Price: 3000  # Exact match
+        IsActive: true
+      - ProductID: "prod-003"
+        Name: "Coffee Mug"
+        Price: 1200  # Exact match
+        IsActive: false
+`
+
+		toleranceFile := "testdata/validation_tolerance.yaml"
+		if err := os.WriteFile(toleranceFile, []byte(toleranceContent), 0644); err != nil {
+			t.Fatalf("Failed to create tolerance validation file: %v", err)
+		}
+		defer os.Remove(toleranceFile)
+
+		cmd := exec.Command("./spalidate-test",
+			"--project", testProject,
+			"--instance", testInstance,
+			"--database", testDatabase,
+			"--port", "9010",
+			"--verbose",
+			toleranceFile,
+		)
+
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("spalidate command failed: %v\nOutput: %s", err, string(output))
+		}
+
+		outputStr := string(output)
+		if !contains(outputStr, "✅ All validations passed!") {
+			t.Errorf("Expected successful validation message, got: %s", outputStr)
+		}
+	})
+
+	// Test composite primary key
+	t.Run("CompositePrimaryKey", func(t *testing.T) {
+		// Create a validation file that uses composite primary key
+		compositeKeyContent := `tables:
+  Orders:
+    count: 3
+    primary_key_columns: ["UserID", "ProductID"]
+    rows:
+      - UserID: "user-001"  # Different order than database
+        ProductID: "prod-001"
+        Quantity: 1
+      - UserID: "user-001"
+        ProductID: "prod-003"
+        Quantity: 1
+      - UserID: "user-002"
+        ProductID: "prod-002"
+        Quantity: 2
+`
+
+		compositeKeyFile := "testdata/validation_composite_key.yaml"
+		if err := os.WriteFile(compositeKeyFile, []byte(compositeKeyContent), 0644); err != nil {
+			t.Fatalf("Failed to create composite key validation file: %v", err)
+		}
+		defer os.Remove(compositeKeyFile)
+
+		cmd := exec.Command("./spalidate-test",
+			"--project", testProject,
+			"--instance", testInstance,
+			"--database", testDatabase,
+			"--port", "9010",
+			"--verbose",
+			compositeKeyFile,
+		)
+
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("spalidate command failed: %v\nOutput: %s", err, string(output))
+		}
+
+		outputStr := string(output)
+		if !contains(outputStr, "✅ All validations passed!") {
+			t.Errorf("Expected successful validation message, got: %s", outputStr)
+		}
+	})
+
 	// Test error case - non-existent table
 	t.Run("NonExistentTable", func(t *testing.T) {
 		nonExistentValidationContent := `tables:
@@ -162,7 +303,7 @@ func TestIntegrationSpalidate(t *testing.T) {
     columns:
       ID: "test"
 `
-		
+
 		nonExistentValidationFile := "testdata/validation_nonexistent.yaml"
 		if err := os.WriteFile(nonExistentValidationFile, []byte(nonExistentValidationContent), 0644); err != nil {
 			t.Fatalf("Failed to create non-existent validation file: %v", err)
@@ -202,9 +343,9 @@ func waitForSpannerEmulator() error {
 }
 
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && 
-		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || 
-		 findSubstring(s, substr)))
+	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
+		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
+			findSubstring(s, substr)))
 }
 
 func findSubstring(s, substr string) bool {

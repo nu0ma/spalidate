@@ -23,5 +23,5 @@ CREATE TABLE Orders (
   ProductID STRING(36) NOT NULL,
   Quantity INT64 NOT NULL,
   OrderDate TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true),
-) PRIMARY KEY (UserID, OrderID),
+) PRIMARY KEY (UserID, ProductID),
 INTERLEAVE IN PARENT Users ON DELETE CASCADE;
