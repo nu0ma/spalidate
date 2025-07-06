@@ -1,6 +1,7 @@
 package validator
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -114,8 +115,22 @@ func (v *Validator) validateColumns(tableName string, tableConfig config.TableCo
 		}
 
 		if !v.compareValues(expectedValue, actualValue) {
-			result.AddError(fmt.Sprintf("Table %s, column %s: expected %v (%T), got %v (%T)",
-				tableName, columnName, expectedValue, expectedValue, actualValue, actualValue))
+			// For debugging: show actual value details
+			actualStr := fmt.Sprintf("%v", actualValue)
+			if actualType := reflect.TypeOf(actualValue); actualType != nil {
+				switch actualType.String() {
+				case "big.Rat":
+					if rat, ok := actualValue.(*big.Rat); ok {
+						actualStr = rat.FloatString(6)
+					}
+				case "time.Time":
+					if t, ok := actualValue.(time.Time); ok {
+						actualStr = t.Format(time.RFC3339Nano)
+					}
+				}
+			}
+			result.AddError(fmt.Sprintf("Table %s, column %s: expected %v (%T), got %s (%T)",
+				tableName, columnName, expectedValue, expectedValue, actualStr, actualValue))
 		} else {
 			result.AddMessage(fmt.Sprintf("Table %s, column %s: value matches", tableName, columnName))
 		}
@@ -140,8 +155,26 @@ func (v *Validator) validateMultipleRows(tableName string, tableConfig config.Ta
 			}
 
 			if !v.compareValues(expectedValue, actualValue) {
-				result.AddError(fmt.Sprintf("Table %s row %d, column %s: expected %v (%T), got %v (%T)",
-					tableName, i+1, columnName, expectedValue, expectedValue, actualValue, actualValue))
+				// For debugging: show actual value details
+				actualStr := fmt.Sprintf("%v", actualValue)
+				if actualType := reflect.TypeOf(actualValue); actualType != nil {
+					switch actualType.String() {
+					case "big.Rat":
+						if rat, ok := actualValue.(*big.Rat); ok {
+							actualStr = rat.FloatString(6)
+						}
+					case "time.Time":
+						if t, ok := actualValue.(time.Time); ok {
+							actualStr = t.Format(time.RFC3339Nano)
+						}
+					case "[]uint8":
+						if bytes, ok := actualValue.([]byte); ok {
+							actualStr = base64.StdEncoding.EncodeToString(bytes)
+						}
+					}
+				}
+				result.AddError(fmt.Sprintf("Table %s row %d, column %s: expected %v (%T), got %s (%T)",
+					tableName, i+1, columnName, expectedValue, expectedValue, actualStr, actualValue))
 			} else {
 				result.AddMessage(fmt.Sprintf("Table %s row %d, column %s: value matches", tableName, i+1, columnName))
 			}
@@ -165,32 +198,42 @@ func (v *Validator) compareValues(expected, actual interface{}) bool {
 	// Handle special Spanner types
 	switch actualType.String() {
 	case "big.Rat":
-		// NUMERIC type
-		actualRat, ok := actual.(*big.Rat)
-		if !ok {
+		// NUMERIC type - handle both pointer and value types
+		var actualRat *big.Rat
+		if rat, ok := actual.(*big.Rat); ok {
+			actualRat = rat
+		} else if rat, ok := actual.(big.Rat); ok {
+			actualRat = &rat
+		} else {
 			return false
 		}
 		
-		// Try to convert expected to big.Rat for precise comparison
+		// Create expected Rat from various input types
 		var expectedRat *big.Rat
 		switch exp := expected.(type) {
-		case float64:
-			expectedRat = new(big.Rat).SetFloat64(exp)
-		case int64:
-			expectedRat = new(big.Rat).SetInt64(exp)
 		case string:
+			var ok bool
 			expectedRat, ok = new(big.Rat).SetString(exp)
 			if !ok {
 				return false
 			}
+		case float64:
+			expectedRat = new(big.Rat).SetFloat64(exp)
+		case int64:
+			expectedRat = new(big.Rat).SetInt64(exp)
+		case int:
+			expectedRat = new(big.Rat).SetInt64(int64(exp))
 		default:
-			// Fallback to string comparison
-			expectedStr := fmt.Sprintf("%v", expected)
-			actualFloat, _ := actualRat.Float64()
-			actualStr := fmt.Sprintf("%g", actualFloat)
-			return expectedStr == actualStr
+			// Try converting to string then to Rat
+			expectedStr := fmt.Sprintf("%v", exp)
+			var ok bool
+			expectedRat, ok = new(big.Rat).SetString(expectedStr)
+			if !ok {
+				return false
+			}
 		}
 		
+		// Compare the Rat values directly
 		return actualRat.Cmp(expectedRat) == 0
 	case "time.Time":
 		// TIMESTAMP type
@@ -199,7 +242,21 @@ func (v *Validator) compareValues(expected, actual interface{}) bool {
 			return false
 		}
 		expectedStr := fmt.Sprintf("%v", expected)
+		
+		// Try to parse expected as time first
+		if parsedTime, err := time.Parse(time.RFC3339Nano, expectedStr); err == nil {
+			return actualTime.Equal(parsedTime)
+		}
+		if parsedTime, err := time.Parse(time.RFC3339, expectedStr); err == nil {
+			return actualTime.Equal(parsedTime)
+		}
+		
+		// Fallback to string comparison with various formats
 		actualStr := actualTime.Format(time.RFC3339Nano)
+		if expectedStr == actualStr {
+			return true
+		}
+		actualStr = actualTime.Format(time.RFC3339)
 		return expectedStr == actualStr
 	case "[]uint8":
 		// BYTES type
@@ -208,6 +265,13 @@ func (v *Validator) compareValues(expected, actual interface{}) bool {
 			return false
 		}
 		expectedStr := fmt.Sprintf("%v", expected)
+		
+		// Try to decode expected as base64 first
+		if expectedBytes, err := base64.StdEncoding.DecodeString(expectedStr); err == nil {
+			return bytes.Equal(actualBytes, expectedBytes)
+		}
+		
+		// Fallback to base64 encoding comparison
 		actualStr := base64.StdEncoding.EncodeToString(actualBytes)
 		return expectedStr == actualStr
 	case "map[string]interface {}":
@@ -217,6 +281,14 @@ func (v *Validator) compareValues(expected, actual interface{}) bool {
 			return false
 		}
 		expectedStr := fmt.Sprintf("%v", expected)
+		
+		// Try to parse expected as JSON first
+		var expectedMap map[string]interface{}
+		if err := json.Unmarshal([]byte(expectedStr), &expectedMap); err == nil {
+			return reflect.DeepEqual(actualMap, expectedMap)
+		}
+		
+		// Fallback to marshaling actual and comparing strings
 		actualJSON, err := json.Marshal(actualMap)
 		if err != nil {
 			return false

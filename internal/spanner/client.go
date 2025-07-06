@@ -3,6 +3,7 @@ package spanner
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"cloud.google.com/go/spanner"
 	"google.golang.org/api/iterator"
@@ -18,6 +19,10 @@ type Row map[string]interface{}
 
 func NewClient(project, instance, database string, port int) (*Client, error) {
 	ctx := context.Background()
+
+	// Set SPANNER_EMULATOR_HOST based on the port parameter
+	emulatorHost := fmt.Sprintf("localhost:%d", port)
+	os.Setenv("SPANNER_EMULATOR_HOST", emulatorHost)
 
 	databasePath := fmt.Sprintf("projects/%s/instances/%s/databases/%s", project, instance, database)
 
