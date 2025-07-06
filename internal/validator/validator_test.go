@@ -31,8 +31,8 @@ func TestCompareValues(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		expected interface{}
-		actual   interface{}
+		expected any
+		actual   any
 		want     bool
 	}{
 		{
