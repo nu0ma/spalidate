@@ -5,13 +5,20 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"testing"
 	"time"
 
-	"cloud.google.com/go/spanner"
+	database "cloud.google.com/go/spanner/admin/database/apiv1"
+	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
+	instance "cloud.google.com/go/spanner/admin/instance/apiv1"
+	"cloud.google.com/go/spanner/admin/instance/apiv1/instancepb"
 	"github.com/nu0ma/spalidate/internal/testutil"
+	"google.golang.org/api/option"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 const (
@@ -22,20 +29,35 @@ const (
 	validationFile      = "testdata/validation.yaml"
 )
 
-func TestIntegrationSpalidate(t *testing.T) {
+func TestMain(m *testing.M) {
 	// Set environment variable for Spanner emulator
 	os.Setenv("SPANNER_EMULATOR_HOST", spannerEmulatorHost)
 
 	// Wait for Spanner emulator to be ready
 	if err := waitForSpannerEmulator(); err != nil {
-		t.Fatalf("Spanner emulator is not ready: %v", err)
+		panic("Spanner emulator is not ready: " + err.Error())
 	}
 
-	// Setup test database with fixtures
-	ctx := context.Background()
-	if err := setupTestDatabase(ctx, t); err != nil {
-		t.Fatalf("Failed to setup test database: %v", err)
+	// Create instance and database
+	if err := setupSpannerInstance(); err != nil {
+		panic("Failed to setup Spanner instance: " + err.Error())
 	}
+
+	// Initialize fixtures
+	if err := testutil.InitFixtures(testProject, testInstance, testDatabase); err != nil {
+		panic("Failed to initialize fixtures: " + err.Error())
+	}
+
+	// Run tests
+	code := m.Run()
+	os.Exit(code)
+}
+
+func prepareTestDatabase() error {
+	return testutil.LoadFixtures()
+}
+
+func TestIntegrationSpalidate(t *testing.T) {
 
 	// Build the spalidate binary
 	buildCmd := exec.Command("go", "build", "-o", "spalidate-test", "main.go")
@@ -46,6 +68,10 @@ func TestIntegrationSpalidate(t *testing.T) {
 
 	// Test successful validation
 	t.Run("SuccessfulValidation", func(t *testing.T) {
+		// Load test fixtures
+		if err := prepareTestDatabase(); err != nil {
+			t.Fatalf("Failed to prepare test database: %v", err)
+		}
 		cmd := exec.Command("./spalidate-test",
 			"--project", testProject,
 			"--instance", testInstance,
@@ -81,6 +107,10 @@ func TestIntegrationSpalidate(t *testing.T) {
 
 	// Test failure case - wrong count validation
 	t.Run("FailureValidation", func(t *testing.T) {
+		// Load test fixtures
+		if err := prepareTestDatabase(); err != nil {
+			t.Fatalf("Failed to prepare test database: %v", err)
+		}
 		// Create a validation file with wrong count
 		wrongValidationContent := `tables:
   Users:
@@ -122,6 +152,10 @@ func TestIntegrationSpalidate(t *testing.T) {
 
 	// Test failure case - wrong column values
 	t.Run("FailureValidationWrongColumns", func(t *testing.T) {
+		// Load test fixtures
+		if err := prepareTestDatabase(); err != nil {
+			t.Fatalf("Failed to prepare test database: %v", err)
+		}
 		// Create a validation file with correct count but wrong column values
 		wrongColumnsContent := `tables:
   Users:
@@ -166,6 +200,10 @@ func TestIntegrationSpalidate(t *testing.T) {
 
 	// Test primary key-based comparison
 	t.Run("PrimaryKeyBasedComparison", func(t *testing.T) {
+		// Load test fixtures
+		if err := prepareTestDatabase(); err != nil {
+			t.Fatalf("Failed to prepare test database: %v", err)
+		}
 		// Create a validation file that uses primary key columns for order-independent comparison
 		primaryKeyContent := `tables:
   Users:
@@ -214,6 +252,10 @@ func TestIntegrationSpalidate(t *testing.T) {
 
 	// Test numeric tolerance feature
 	t.Run("NumericToleranceComparison", func(t *testing.T) {
+		// Load test fixtures
+		if err := prepareTestDatabase(); err != nil {
+			t.Fatalf("Failed to prepare test database: %v", err)
+		}
 		// Create a validation file that tests numeric tolerance
 		toleranceContent := `tables:
   Products:
@@ -262,6 +304,10 @@ func TestIntegrationSpalidate(t *testing.T) {
 
 	// Test composite primary key
 	t.Run("CompositePrimaryKey", func(t *testing.T) {
+		// Load test fixtures
+		if err := prepareTestDatabase(); err != nil {
+			t.Fatalf("Failed to prepare test database: %v", err)
+		}
 		// Create a validation file that uses composite primary key
 		compositeKeyContent := `tables:
   Orders:
@@ -307,6 +353,10 @@ func TestIntegrationSpalidate(t *testing.T) {
 
 	// Test error case - non-existent table
 	t.Run("NonExistentTable", func(t *testing.T) {
+		// Load test fixtures
+		if err := prepareTestDatabase(); err != nil {
+			t.Fatalf("Failed to prepare test database: %v", err)
+		}
 		nonExistentValidationContent := `tables:
   NonExistentTable:
     count: 1
@@ -367,22 +417,74 @@ func findSubstring(s, substr string) bool {
 	return false
 }
 
-// setupTestDatabase creates the test database schema and loads fixtures
-func setupTestDatabase(ctx context.Context, t *testing.T) error {
-	// Create Spanner client
-	client, err := spanner.NewClient(ctx, "projects/"+testProject+"/instances/"+testInstance+"/databases/"+testDatabase)
+func setupSpannerInstance() error {
+	ctx := context.Background()
+	
+	// Set up clients for emulator
+	opts := []option.ClientOption{
+		option.WithEndpoint(spannerEmulatorHost),
+		option.WithoutAuthentication(),
+		option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
+	}
+	
+	// Create instance admin client
+	instanceAdminClient, err := instance.NewInstanceAdminClient(ctx, opts...)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create instance admin client: %w", err)
 	}
-	defer client.Close()
-
-	// Create fixture helper
-	fixtureHelper := testutil.NewFixtureHelper(client, testDatabase)
-
-	// Load fixtures
-	if err := fixtureHelper.LoadFixtures(ctx); err != nil {
-		return err
+	defer instanceAdminClient.Close()
+	
+	// Create instance
+	instanceReq := &instancepb.CreateInstanceRequest{
+		Parent:     "projects/" + testProject,
+		InstanceId: testInstance,
+		Instance: &instancepb.Instance{
+			DisplayName: "Test Instance",
+			Config:      "projects/" + testProject + "/instanceConfigs/emulator-config",
+			NodeCount:   1,
+		},
 	}
-
+	
+	instanceOp, err := instanceAdminClient.CreateInstance(ctx, instanceReq)
+	if err != nil {
+		// Instance might already exist, continue
+		fmt.Printf("Instance creation failed (may already exist): %v\n", err)
+	} else {
+		_, err = instanceOp.Wait(ctx)
+		if err != nil {
+			fmt.Printf("Failed to wait for instance creation: %v\n", err)
+		}
+	}
+	
+	// Create database admin client
+	databaseAdminClient, err := database.NewDatabaseAdminClient(ctx, opts...)
+	if err != nil {
+		return fmt.Errorf("failed to create database admin client: %w", err)
+	}
+	defer databaseAdminClient.Close()
+	
+	// Create database
+	databaseReq := &databasepb.CreateDatabaseRequest{
+		Parent:          fmt.Sprintf("projects/%s/instances/%s", testProject, testInstance),
+		CreateStatement: fmt.Sprintf("CREATE DATABASE `%s`", testDatabase),
+		ExtraStatements: []string{
+			"CREATE TABLE Users (UserID STRING(36) NOT NULL, Name STRING(100) NOT NULL, Email STRING(255) NOT NULL, Status INT64 NOT NULL, CreatedAt TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true)) PRIMARY KEY (UserID)",
+			"CREATE TABLE Products (ProductID STRING(36) NOT NULL, Name STRING(200) NOT NULL, Price INT64 NOT NULL, IsActive BOOL NOT NULL, CategoryID STRING(36), CreatedAt TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true)) PRIMARY KEY (ProductID)",
+			"CREATE TABLE Orders (OrderID STRING(36) NOT NULL, UserID STRING(36) NOT NULL, ProductID STRING(36) NOT NULL, Quantity INT64 NOT NULL, OrderDate TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true)) PRIMARY KEY (UserID, ProductID), INTERLEAVE IN PARENT Users ON DELETE CASCADE",
+		},
+	}
+	
+	databaseOp, err := databaseAdminClient.CreateDatabase(ctx, databaseReq)
+	if err != nil {
+		// Database might already exist, continue
+		fmt.Printf("Database creation failed (may already exist): %v\n", err)
+		return nil
+	}
+	
+	_, err = databaseOp.Wait(ctx)
+	if err != nil {
+		fmt.Printf("Failed to wait for database creation: %v\n", err)
+	}
+	
 	return nil
 }
