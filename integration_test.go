@@ -419,21 +419,21 @@ func findSubstring(s, substr string) bool {
 
 func setupSpannerInstance() error {
 	ctx := context.Background()
-	
+
 	// Set up clients for emulator
 	opts := []option.ClientOption{
 		option.WithEndpoint(spannerEmulatorHost),
 		option.WithoutAuthentication(),
 		option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
 	}
-	
+
 	// Create instance admin client
 	instanceAdminClient, err := instance.NewInstanceAdminClient(ctx, opts...)
 	if err != nil {
 		return fmt.Errorf("failed to create instance admin client: %w", err)
 	}
 	defer instanceAdminClient.Close()
-	
+
 	// Create instance
 	instanceReq := &instancepb.CreateInstanceRequest{
 		Parent:     "projects/" + testProject,
@@ -444,7 +444,7 @@ func setupSpannerInstance() error {
 			NodeCount:   1,
 		},
 	}
-	
+
 	instanceOp, err := instanceAdminClient.CreateInstance(ctx, instanceReq)
 	if err != nil {
 		// Instance might already exist, continue
@@ -455,14 +455,14 @@ func setupSpannerInstance() error {
 			fmt.Printf("Failed to wait for instance creation: %v\n", err)
 		}
 	}
-	
+
 	// Create database admin client
 	databaseAdminClient, err := database.NewDatabaseAdminClient(ctx, opts...)
 	if err != nil {
 		return fmt.Errorf("failed to create database admin client: %w", err)
 	}
 	defer databaseAdminClient.Close()
-	
+
 	// Create database
 	databaseReq := &databasepb.CreateDatabaseRequest{
 		Parent:          fmt.Sprintf("projects/%s/instances/%s", testProject, testInstance),
@@ -473,18 +473,18 @@ func setupSpannerInstance() error {
 			"CREATE TABLE Orders (OrderID STRING(36) NOT NULL, UserID STRING(36) NOT NULL, ProductID STRING(36) NOT NULL, Quantity INT64 NOT NULL, OrderDate TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true)) PRIMARY KEY (UserID, ProductID), INTERLEAVE IN PARENT Users ON DELETE CASCADE",
 		},
 	}
-	
+
 	databaseOp, err := databaseAdminClient.CreateDatabase(ctx, databaseReq)
 	if err != nil {
 		// Database might already exist, continue
 		fmt.Printf("Database creation failed (may already exist): %v\n", err)
 		return nil
 	}
-	
+
 	_, err = databaseOp.Wait(ctx)
 	if err != nil {
 		fmt.Printf("Failed to wait for database creation: %v\n", err)
 	}
-	
+
 	return nil
 }
