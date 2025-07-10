@@ -2,6 +2,7 @@ package spanner
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -164,7 +165,19 @@ func (c *Client) QueryRowsWithOrder(tableName string, columns []string, orderBy 
 					return nil, fmt.Errorf("failed to decode json: %w", err)
 				}
 				if v.Valid {
-					rowData[columnNames[i]] = v.Value
+					// Handle both string and parsed object cases
+					switch val := v.Value.(type) {
+					case string:
+						// If Spanner returns JSON as string, keep as string for validation
+						rowData[columnNames[i]] = val
+					default:
+						// If already parsed, convert back to JSON string for consistent handling
+						jsonBytes, err := json.Marshal(val)
+						if err != nil {
+							return nil, fmt.Errorf("failed to marshal JSON value: %w", err)
+						}
+						rowData[columnNames[i]] = string(jsonBytes)
+					}
 				} else {
 					rowData[columnNames[i]] = nil
 				}

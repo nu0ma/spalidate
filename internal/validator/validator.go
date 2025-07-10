@@ -519,8 +519,44 @@ func (v *Validator) compareJSON(expected, actual interface{}) bool {
 		return false
 	}
 
+	// Normalize JSON numeric types before comparison
+	actualParsed = v.normalizeJSONNumbers(actualParsed)
+	expectedParsed = v.normalizeJSONNumbers(expectedParsed)
+
 	// Use DeepEqual for comparison
 	return reflect.DeepEqual(expectedParsed, actualParsed)
+}
+
+// normalizeJSONNumbers normalizes JSON numeric types to handle int/float64 mismatches
+func (v *Validator) normalizeJSONNumbers(data interface{}) interface{} {
+	switch val := data.(type) {
+	case map[string]interface{}:
+		result := make(map[string]interface{})
+		for k, value := range val {
+			result[k] = v.normalizeJSONNumbers(value)
+		}
+		return result
+	case []interface{}:
+		result := make([]interface{}, len(val))
+		for i, value := range val {
+			result[i] = v.normalizeJSONNumbers(value)
+		}
+		return result
+	case float64:
+		// Check if it's actually an integer
+		if val == float64(int64(val)) {
+			return int64(val)
+		}
+		return val
+	case int:
+		return int64(val)
+	case int32:
+		return int64(val)
+	case int64:
+		return val
+	default:
+		return val
+	}
 }
 
 // compareSlices compares array/slice values recursively
@@ -630,12 +666,13 @@ func (v *Validator) compareIntegerConversions(expected, actual interface{}) bool
 	return expectedInt == actualInt
 }
 
-// isJSONString checks if a string appears to be JSON
+// isJSONString checks if a string is valid JSON
 func (v *Validator) isJSONString(s string) bool {
 	s = strings.TrimSpace(s)
 	if len(s) == 0 {
 		return false
 	}
-	// Check if it starts with JSON object or array markers
-	return (s[0] == '{' && s[len(s)-1] == '}') || (s[0] == '[' && s[len(s)-1] == ']') || s == "null" || s == "true" || s == "false" || (len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"')
+	// Actually validate JSON syntax by attempting to parse
+	var js interface{}
+	return json.Unmarshal([]byte(s), &js) == nil
 }
