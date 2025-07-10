@@ -29,10 +29,10 @@ func InitFixtures(project, instance, database string) error {
 		testfixtures.Dialect("spanner"),
 		testfixtures.DangerousSkipTestDatabaseCheck(), // Skip database check for emulator
 		testfixtures.Files(
-			"testdata/fixtures/users.yml",         // Parent table first
-			"testdata/fixtures/products.yml",      // Independent table
-			"testdata/fixtures/orders.yml",        // Child table (interleaved with Users)
-			"testdata/fixtures/json_test_table.yml", // JSON test table
+			"testdata/fixtures/data/users.yml",         // Parent table first
+			"testdata/fixtures/data/products.yml",      // Independent table
+			"testdata/fixtures/data/orders.yml",        // Child table (interleaved with Users)
+			"testdata/fixtures/data/json_test_table.yml", // JSON test table
 		),
 	)
 	if err != nil {
