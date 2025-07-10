@@ -11,6 +11,11 @@ import (
 	sppb "google.golang.org/genproto/googleapis/spanner/v1"
 )
 
+const (
+	// JSON TypeCode constant (value 11) for Spanner JSON type
+	TypeCode_JSON sppb.TypeCode = 11
+)
+
 type Client struct {
 	client   *spanner.Client
 	database string
@@ -153,6 +158,16 @@ func (c *Client) QueryRowsWithOrder(tableName string, columns []string, orderBy 
 					return nil, fmt.Errorf("failed to decode date: %w", err)
 				}
 				rowData[columnNames[i]] = v
+			case TypeCode_JSON:
+				var v spanner.NullJSON
+				if err := col.Decode(&v); err != nil {
+					return nil, fmt.Errorf("failed to decode json: %w", err)
+				}
+				if v.Valid {
+					rowData[columnNames[i]] = v.Value
+				} else {
+					rowData[columnNames[i]] = nil
+				}
 			default:
 				// For unknown types, store the raw value
 				rowData[columnNames[i]] = col.Value

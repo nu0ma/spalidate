@@ -351,6 +351,76 @@ func TestIntegrationSpalidate(t *testing.T) {
 		}
 	})
 
+	// Test JSON validation
+	t.Run("JSONValidation", func(t *testing.T) {
+		// Load test fixtures
+		if err := prepareTestDatabase(); err != nil {
+			t.Fatalf("Failed to prepare test database: %v", err)
+		}
+		
+		// Insert test data with JSON columns
+		insertJSONData := `
+		INSERT INTO JSONTestTable (ID, Data, Metadata) VALUES
+		('json-001', JSON '{"name": "John", "age": 30}', JSON '{"tags": ["admin", "user"], "active": true}'),
+		('json-002', JSON '{"name": "Jane", "age": 25}', JSON '{"tags": ["user"], "active": false}'),
+		('json-003', JSON 'null', JSON '{}')
+		`
+		
+		// Execute SQL directly using spanner client
+		cmd := exec.Command("gcloud", "spanner", "databases", "execute-sql", testDatabase,
+			"--instance", testInstance,
+			"--project", testProject,
+			"--sql", insertJSONData,
+		)
+		cmd.Env = append(os.Environ(), "SPANNER_EMULATOR_HOST=localhost:9010")
+		if err := cmd.Run(); err != nil {
+			t.Logf("Failed to insert JSON data via gcloud (might not be available in emulator): %v", err)
+			// Skip this test if we can't insert JSON data
+			t.Skip("JSON insertion not supported in test environment")
+		}
+
+		jsonValidationContent := `tables:
+  JSONTestTable:
+    count: 3
+    order_by: "ID"
+    rows:
+      - ID: "json-001"
+        Data: '{"name": "John", "age": 30}'
+        Metadata: '{"tags": ["admin", "user"], "active": true}'
+      - ID: "json-002"
+        Data: '{"name": "Jane", "age": 25}'
+        Metadata: '{"tags": ["user"], "active": false}'
+      - ID: "json-003"
+        Data: 'null'
+        Metadata: '{}'
+`
+
+		jsonValidationFile := "testdata/validation_json.yaml"
+		if err := os.WriteFile(jsonValidationFile, []byte(jsonValidationContent), 0644); err != nil {
+			t.Fatalf("Failed to create JSON validation file: %v", err)
+		}
+		defer os.Remove(jsonValidationFile)
+
+		cmd = exec.Command("./spalidate-test",
+			"--project", testProject,
+			"--instance", testInstance,
+			"--database", testDatabase,
+			"--port", "9010",
+			"--verbose",
+			jsonValidationFile,
+		)
+
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("spalidate command failed: %v\nOutput: %s", err, string(output))
+		}
+
+		outputStr := string(output)
+		if !contains(outputStr, "✅ All validations passed!") {
+			t.Errorf("Expected successful validation message, got: %s", outputStr)
+		}
+	})
+
 	// Test error case - non-existent table
 	t.Run("NonExistentTable", func(t *testing.T) {
 		// Load test fixtures
@@ -471,6 +541,7 @@ func setupSpannerInstance() error {
 			"CREATE TABLE Users (UserID STRING(36) NOT NULL, Name STRING(100) NOT NULL, Email STRING(255) NOT NULL, Status INT64 NOT NULL, CreatedAt TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true)) PRIMARY KEY (UserID)",
 			"CREATE TABLE Products (ProductID STRING(36) NOT NULL, Name STRING(200) NOT NULL, Price INT64 NOT NULL, IsActive BOOL NOT NULL, CategoryID STRING(36), CreatedAt TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true)) PRIMARY KEY (ProductID)",
 			"CREATE TABLE Orders (OrderID STRING(36) NOT NULL, UserID STRING(36) NOT NULL, ProductID STRING(36) NOT NULL, Quantity INT64 NOT NULL, OrderDate TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true)) PRIMARY KEY (UserID, ProductID), INTERLEAVE IN PARENT Users ON DELETE CASCADE",
+			"CREATE TABLE JSONTestTable (ID STRING(36) NOT NULL, Data JSON, Metadata JSON) PRIMARY KEY (ID)",
 		},
 	}
 

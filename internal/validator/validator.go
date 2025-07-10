@@ -279,6 +279,11 @@ func (v *Validator) compareValues(expected, actual interface{}) bool {
 		return v.compareBytes(expected, actual)
 	case "map[string]interface{}", "map[string]interface {}":
 		return v.compareJSON(expected, actual)
+	case "string":
+		// Check if this is a JSON string from Spanner
+		if v.isJSONString(actual.(string)) {
+			return v.compareJSON(expected, actual)
+		}
 	}
 
 	// Handle arrays/slices
@@ -468,38 +473,54 @@ func (v *Validator) compareBytes(expected, actual interface{}) bool {
 
 // compareJSON compares JSON values with optional key order independence
 func (v *Validator) compareJSON(expected, actual interface{}) bool {
-	actualMap, ok := actual.(map[string]interface{})
-	if !ok {
+	// Parse actual value to JSON
+	var actualParsed interface{}
+	switch a := actual.(type) {
+	case string:
+		// JSON string from Spanner
+		if err := json.Unmarshal([]byte(a), &actualParsed); err != nil {
+			return false
+		}
+	case map[string]interface{}:
+		actualParsed = a
+	case []interface{}:
+		actualParsed = a
+	default:
 		return false
 	}
 
-	var expectedMap map[string]interface{}
-	switch exp := expected.(type) {
-	case map[string]interface{}:
-		expectedMap = exp
+	// Parse expected value to JSON
+	var expectedParsed interface{}
+	switch e := expected.(type) {
 	case string:
-		if err := json.Unmarshal([]byte(exp), &expectedMap); err != nil {
-			// If parsing fails, compare as string
-			actualJSON, err := json.Marshal(actualMap)
-			if err != nil {
-				return false
-			}
-			return exp == string(actualJSON)
+		if err := json.Unmarshal([]byte(e), &expectedParsed); err != nil {
+			return false
 		}
+	case map[string]interface{}:
+		expectedParsed = e
+	case []interface{}:
+		expectedParsed = e
 	default:
-		// Try to convert to JSON string
-		expectedBytes, err := json.Marshal(exp)
+		// Try to convert to JSON string first
+		expectedBytes, err := json.Marshal(expected)
 		if err != nil {
 			return false
 		}
-		if err := json.Unmarshal(expectedBytes, &expectedMap); err != nil {
+		if err := json.Unmarshal(expectedBytes, &expectedParsed); err != nil {
 			return false
 		}
 	}
 
-	// Always use DeepEqual for JSON comparison since map iteration order is not guaranteed in Go
-	// The IgnoreJSONKeyOrder option is kept for compatibility but doesn't affect behavior
-	return reflect.DeepEqual(actualMap, expectedMap)
+	// Handle null values
+	if actualParsed == nil && expectedParsed == nil {
+		return true
+	}
+	if actualParsed == nil || expectedParsed == nil {
+		return false
+	}
+
+	// Use DeepEqual for comparison
+	return reflect.DeepEqual(expectedParsed, actualParsed)
 }
 
 // compareSlices compares array/slice values recursively
@@ -607,4 +628,14 @@ func (v *Validator) compareIntegerConversions(expected, actual interface{}) bool
 	}
 
 	return expectedInt == actualInt
+}
+
+// isJSONString checks if a string appears to be JSON
+func (v *Validator) isJSONString(s string) bool {
+	s = strings.TrimSpace(s)
+	if len(s) == 0 {
+		return false
+	}
+	// Check if it starts with JSON object or array markers
+	return (s[0] == '{' && s[len(s)-1] == '}') || (s[0] == '[' && s[len(s)-1] == ']') || s == "null" || s == "true" || s == "false" || (len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"')
 }
