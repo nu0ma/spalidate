@@ -26,7 +26,7 @@ const (
 	testProject         = "test-project"
 	testInstance        = "test-instance"
 	testDatabase        = "test-database"
-	validationFile      = "testdata/validation.yaml"
+	validationFile      = "testdata/validations/basic.yaml"
 )
 
 func TestMain(m *testing.M) {
@@ -364,7 +364,7 @@ func TestIntegrationSpalidate(t *testing.T) {
 			"--database", testDatabase,
 			"--port", "9010",
 			"--verbose",
-			"testdata/validation_json_full.yaml",
+			"testdata/validations/json/full.yaml",
 		)
 
 		output, err := cmd.CombinedOutput()
@@ -403,7 +403,7 @@ func TestIntegrationSpalidate(t *testing.T) {
 			"--database", testDatabase,
 			"--port", "9010",
 			"--verbose",
-			"testdata/validation_json_key_order.yaml",
+			"testdata/validations/json/key_order.yaml",
 		)
 
 		output, err := cmd.CombinedOutput()
@@ -429,7 +429,7 @@ func TestIntegrationSpalidate(t *testing.T) {
 			"--instance", testInstance,
 			"--database", testDatabase,
 			"--port", "9010",
-			"testdata/validation_json_wrong.yaml",
+			"testdata/validations/json/wrong.yaml",
 		)
 
 		output, err := cmd.CombinedOutput()
@@ -462,7 +462,7 @@ func TestIntegrationSpalidate(t *testing.T) {
 			"--database", testDatabase,
 			"--port", "9010",
 			"--verbose",
-			"testdata/validation_json_numeric_types.yaml",
+			"testdata/validations/json/numeric_types.yaml",
 		)
 
 		output, err := cmd.CombinedOutput()
