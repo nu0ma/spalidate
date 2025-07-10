@@ -32,6 +32,7 @@ func InitFixtures(project, instance, database string) error {
 			"testdata/fixtures/users.yml",    // Parent table first
 			"testdata/fixtures/products.yml", // Independent table
 			"testdata/fixtures/orders.yml",   // Child table (interleaved with Users)
+			"testdata/fixtures/json.yaml",   // JSONTestTable table
 		),
 	)
 	if err != nil {
