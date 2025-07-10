@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0](https://github.com/nu0ma/spalidate/compare/spalidate-v1.1.0...spalidate-v1.2.0) (2025-07-10)
+
+
+### Features
+
+* add manual tag creation workflow ([6137bae](https://github.com/nu0ma/spalidate/commit/6137baedf2cea74782bdc2b7e15358662a166bbb))
+* add manual tag creation workflow ([35ecdf8](https://github.com/nu0ma/spalidate/commit/35ecdf89663112956b8c8fc0bbcf355c68215800))
+
 ## [1.1.0](https://github.com/nu0ma/spalidate/compare/spalidate-v1.0.0...spalidate-v1.1.0) (2025-07-07)
 
 
