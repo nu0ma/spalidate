@@ -1,0 +1,22 @@
+tables:
+  # Test JSON key order independence - same data but different key orders
+  JSONTestTable:
+    count: 5
+    primary_key_columns: ["ID"]
+    rows:
+      - ID: "json-001"
+        # Different key order from fixture - should still match
+        Data: '{"address": {"country": "Japan", "city": "Tokyo"}, "name": "John Doe", "age": 30}'
+        Metadata: '{"score": 95.5, "active": true, "tags": ["admin", "developer"]}'
+      - ID: "json-002"
+        Data: '{"preferences": {"notifications": true, "theme": "dark"}, "age": 25, "name": "Jane Smith"}'
+        Metadata: '{"active": false, "score": 87, "tags": ["user"]}'
+      - ID: "json-003"
+        Data: 'null'
+        Metadata: '{}'
+      - ID: "json-004"
+        Data: '{"products": [{"name": "Laptop", "id": 1}, {"name": "Mouse", "id": 2}]}'
+        Metadata: '{"version": 1.0, "created_at": "2024-01-01T00:00:00Z"}'
+      - ID: "json-005"
+        Data: '{"boolean_values": [true, false, null], "empty_array": [], "empty_object": {}}'
+        Metadata: '{"test": true}'

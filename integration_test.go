@@ -351,73 +351,151 @@ func TestIntegrationSpalidate(t *testing.T) {
 		}
 	})
 
-	// Test JSON validation
+	// Test JSON validation - successful case
 	t.Run("JSONValidation", func(t *testing.T) {
-		// Load test fixtures
+		// Load test fixtures with JSON data
 		if err := prepareTestDatabase(); err != nil {
 			t.Fatalf("Failed to prepare test database: %v", err)
 		}
-		
-		// Insert test data with JSON columns
-		insertJSONData := `
-		INSERT INTO JSONTestTable (ID, Data, Metadata) VALUES
-		('json-001', JSON '{"name": "John", "age": 30}', JSON '{"tags": ["admin", "user"], "active": true}'),
-		('json-002', JSON '{"name": "Jane", "age": 25}', JSON '{"tags": ["user"], "active": false}'),
-		('json-003', JSON 'null', JSON '{}')
-		`
-		
-		// Execute SQL directly using spanner client
-		cmd := exec.Command("gcloud", "spanner", "databases", "execute-sql", testDatabase,
-			"--instance", testInstance,
-			"--project", testProject,
-			"--sql", insertJSONData,
-		)
-		cmd.Env = append(os.Environ(), "SPANNER_EMULATOR_HOST=localhost:9010")
-		if err := cmd.Run(); err != nil {
-			t.Logf("Failed to insert JSON data via gcloud (might not be available in emulator): %v", err)
-			// Skip this test if we can't insert JSON data
-			t.Skip("JSON insertion not supported in test environment")
-		}
 
-		jsonValidationContent := `tables:
-  JSONTestTable:
-    count: 3
-    order_by: "ID"
-    rows:
-      - ID: "json-001"
-        Data: '{"name": "John", "age": 30}'
-        Metadata: '{"tags": ["admin", "user"], "active": true}'
-      - ID: "json-002"
-        Data: '{"name": "Jane", "age": 25}'
-        Metadata: '{"tags": ["user"], "active": false}'
-      - ID: "json-003"
-        Data: 'null'
-        Metadata: '{}'
-`
-
-		jsonValidationFile := "testdata/validation_json.yaml"
-		if err := os.WriteFile(jsonValidationFile, []byte(jsonValidationContent), 0644); err != nil {
-			t.Fatalf("Failed to create JSON validation file: %v", err)
-		}
-		defer os.Remove(jsonValidationFile)
-
-		cmd = exec.Command("./spalidate-test",
+		cmd := exec.Command("./spalidate-test",
 			"--project", testProject,
 			"--instance", testInstance,
 			"--database", testDatabase,
 			"--port", "9010",
 			"--verbose",
-			jsonValidationFile,
+			"testdata/validation_json_full.yaml",
 		)
 
 		output, err := cmd.CombinedOutput()
+		outputStr := string(output)
+		
+		// Check if JSON table exists or is supported
+		if contains(outputStr, "does not exist") && contains(outputStr, "JSONTestTable") {
+			t.Skip("JSON table not supported in Spanner emulator - skipping JSON validation tests")
+		}
+		
 		if err != nil {
-			t.Fatalf("spalidate command failed: %v\nOutput: %s", err, string(output))
+			t.Fatalf("spalidate command failed: %v\nOutput: %s", err, outputStr)
 		}
 
-		outputStr := string(output)
 		if !contains(outputStr, "✅ All validations passed!") {
 			t.Errorf("Expected successful validation message, got: %s", outputStr)
+		}
+
+		// Check that JSON validation messages are present
+		expectedMessages := []string{
+			"Table JSONTestTable: row count matches (5)",
+			"value matches",
+		}
+
+		for _, msg := range expectedMessages {
+			if !contains(outputStr, msg) {
+				t.Errorf("Expected message '%s' not found in output: %s", msg, outputStr)
+			}
+		}
+	})
+
+	// Test JSON validation - key order independence
+	t.Run("JSONValidation_KeyOrderIndependence", func(t *testing.T) {
+		// Load test fixtures
+		if err := prepareTestDatabase(); err != nil {
+			t.Fatalf("Failed to prepare test database: %v", err)
+		}
+
+		cmd := exec.Command("./spalidate-test",
+			"--project", testProject,
+			"--instance", testInstance,
+			"--database", testDatabase,
+			"--port", "9010",
+			"--verbose",
+			"testdata/validation_json_key_order.yaml",
+		)
+
+		output, err := cmd.CombinedOutput()
+		outputStr := string(output)
+		
+		// Check if JSON table exists or is supported
+		if contains(outputStr, "does not exist") && contains(outputStr, "JSONTestTable") {
+			t.Skip("JSON table not supported in Spanner emulator - skipping JSON validation tests")
+		}
+		
+		if err != nil {
+			t.Fatalf("spalidate command failed: %v\nOutput: %s", err, outputStr)
+		}
+
+		if !contains(outputStr, "✅ All validations passed!") {
+			t.Errorf("Expected successful validation message, got: %s", outputStr)
+		}
+	})
+
+	// Test JSON validation - failure case
+	t.Run("JSONValidation_Failure", func(t *testing.T) {
+		// Load test fixtures
+		if err := prepareTestDatabase(); err != nil {
+			t.Fatalf("Failed to prepare test database: %v", err)
+		}
+
+		cmd := exec.Command("./spalidate-test",
+			"--project", testProject,
+			"--instance", testInstance,
+			"--database", testDatabase,
+			"--port", "9010",
+			"testdata/validation_json_wrong.yaml",
+		)
+
+		output, err := cmd.CombinedOutput()
+		outputStr := string(output)
+		
+		// Check if JSON table exists or is supported
+		if contains(outputStr, "does not exist") && contains(outputStr, "JSONTestTable") {
+			t.Skip("JSON table not supported in Spanner emulator - skipping JSON validation tests")
+		}
+		
+		if err == nil {
+			t.Fatalf("Expected spalidate to fail with wrong JSON values, but it succeeded")
+		}
+
+		if !contains(outputStr, "Validation failed:") {
+			t.Errorf("Expected validation failure message, got: %s", outputStr)
+		}
+
+		// Check for JSON validation error messages
+		if !contains(outputStr, "expected") || !contains(outputStr, "got") {
+			t.Errorf("Expected JSON validation error in output: %s", outputStr)
+		}
+	})
+
+	// Test JSON validation - numeric type normalization
+	t.Run("JSONValidation_NumericTypes", func(t *testing.T) {
+		// Load test fixtures
+		if err := prepareTestDatabase(); err != nil {
+			t.Fatalf("Failed to prepare test database: %v", err)
+		}
+
+		cmd := exec.Command("./spalidate-test",
+			"--project", testProject,
+			"--instance", testInstance,
+			"--database", testDatabase,
+			"--port", "9010",
+			"--verbose",
+			"testdata/validation_json_numeric_types.yaml",
+		)
+
+		output, err := cmd.CombinedOutput()
+		outputStr := string(output)
+		
+		// Check if JSON table exists or is supported
+		if contains(outputStr, "does not exist") && contains(outputStr, "JSONTestTable") {
+			t.Skip("JSON table not supported in Spanner emulator - skipping JSON validation tests")
+		}
+		
+		if err != nil {
+			t.Fatalf("spalidate command failed: %v\nOutput: %s", err, outputStr)
+		}
+
+		if !contains(outputStr, "✅ All validations passed!") {
+			t.Errorf("Expected successful validation message with numeric normalization, got: %s", outputStr)
 		}
 	})
 

@@ -1,0 +1,19 @@
+- ID: "json-001"
+  Data: '{"name": "John Doe", "age": 30, "address": {"city": "Tokyo", "country": "Japan"}}'
+  Metadata: '{"tags": ["admin", "developer"], "active": true, "score": 95.5}'
+
+- ID: "json-002"
+  Data: '{"name": "Jane Smith", "age": 25, "preferences": {"theme": "dark", "notifications": true}}'
+  Metadata: '{"tags": ["user"], "active": false, "score": 87}'
+
+- ID: "json-003"
+  Data: 'null'
+  Metadata: '{}'
+
+- ID: "json-004"
+  Data: '{"products": [{"id": 1, "name": "Laptop"}, {"id": 2, "name": "Mouse"}]}'
+  Metadata: '{"created_at": "2024-01-01T00:00:00Z", "version": 1.0}'
+
+- ID: "json-005"
+  Data: '{"empty_object": {}, "empty_array": [], "boolean_values": [true, false, null]}'
+  Metadata: '{"test": true}'

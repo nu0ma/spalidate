@@ -1,0 +1,22 @@
+tables:
+  # Test JSON numeric type normalization - integers vs floats
+  JSONTestTable:
+    count: 5
+    order_by: "ID"
+    rows:
+      - ID: "json-001"
+        # Test integer vs float64 normalization
+        Data: '{"name": "John Doe", "age": 30.0, "address": {"city": "Tokyo", "country": "Japan"}}'
+        Metadata: '{"tags": ["admin", "developer"], "active": true, "score": 95.0}'
+      - ID: "json-002"
+        Data: '{"name": "Jane Smith", "age": 25.0, "preferences": {"theme": "dark", "notifications": true}}'
+        Metadata: '{"tags": ["user"], "active": false, "score": 87.0}'
+      - ID: "json-003"
+        Data: 'null'
+        Metadata: '{}'
+      - ID: "json-004"
+        Data: '{"products": [{"id": 1.0, "name": "Laptop"}, {"id": 2.0, "name": "Mouse"}]}'
+        Metadata: '{"created_at": "2024-01-01T00:00:00Z", "version": 1}'
+      - ID: "json-005"
+        Data: '{"empty_object": {}, "empty_array": [], "boolean_values": [true, false, null]}'
+        Metadata: '{"test": true}'
