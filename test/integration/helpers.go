@@ -8,6 +8,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+
+	"github.com/nu0ma/spalidate/internal/testutil"
+)
+
+const (
+	testProject  = "test-project"
+	testInstance = "test-instance"
+	testDatabase = "test-database"
 )
 
 // TestConfig holds configuration for running spalidate tests
@@ -73,6 +81,11 @@ func RunSpalidate(t *testing.T, config *TestConfig) ([]byte, error) {
 	// Execute command
 	cmd := exec.Command(config.BinaryPath, args...)
 	return cmd.CombinedOutput()
+}
+
+// prepareTestDatabase prepares the test database with fixtures
+func prepareTestDatabase() error {
+	return testutil.LoadFixtures()
 }
 
 // BuildSpalidate builds the spalidate binary for testing
