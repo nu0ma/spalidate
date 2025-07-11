@@ -10,7 +10,7 @@ test-unit:
 # Integration tests
 test-integration: setup-integration
 	@echo "Running integration tests..."
-	SPANNER_EMULATOR_HOST=localhost:9010 go test -v -tags=integration ./integration_test.go
+	cd test/integration && SPANNER_EMULATOR_HOST=localhost:9010 go test -v -tags=integration ./...
 	@$(MAKE) cleanup-integration
 
 # Setup integration test environment
