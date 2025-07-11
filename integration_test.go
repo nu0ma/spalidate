@@ -388,6 +388,149 @@ func TestIntegrationSpalidate(t *testing.T) {
 			t.Errorf("Expected table not found message, got: %s", outputStr)
 		}
 	})
+
+	// Test timestamp validation with different formats
+	t.Run("TimestampValidation", func(t *testing.T) {
+		// Load test fixtures
+		if err := prepareTestDatabase(); err != nil {
+			t.Fatalf("Failed to prepare test database: %v", err)
+		}
+		// Create a validation file with different timestamp formats
+		timestampContent := `tables:
+  Users:
+    count: 3
+    order_by: "UserID"
+    rows:
+      - UserID: "user-001"
+        Name: "Alice Johnson"
+        Email: "alice@example.com"
+        Status: 1
+        CreatedAt: "2024-01-01T00:00:00Z"  # RFC3339
+      - UserID: "user-002"
+        Name: "Bob Smith"
+        Email: "bob@example.com"
+        Status: 2
+        CreatedAt: "2024-01-01 00:00:00"  # Alternative format
+      - UserID: "user-003"
+        Name: "Charlie Brown"
+        Email: "charlie@example.com"
+        Status: 1
+        CreatedAt: "2024-01-01T00:00:00"  # Without timezone
+`
+
+		timestampFile := "testdata/validation_timestamp.yaml"
+		if err := os.WriteFile(timestampFile, []byte(timestampContent), 0644); err != nil {
+			t.Fatalf("Failed to create timestamp validation file: %v", err)
+		}
+		defer os.Remove(timestampFile)
+
+		cmd := exec.Command("./spalidate-test",
+			"--project", testProject,
+			"--instance", testInstance,
+			"--database", testDatabase,
+			"--port", "9010",
+			"--verbose",
+			timestampFile,
+		)
+
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("spalidate command failed: %v\nOutput: %s", err, string(output))
+		}
+
+		outputStr := string(output)
+		if !contains(outputStr, "✅ All validations passed!") {
+			t.Errorf("Expected successful validation message, got: %s", outputStr)
+		}
+		
+		// Check that timestamp fields were validated
+		if !contains(outputStr, "CreatedAt: value matches") {
+			t.Errorf("Expected timestamp validation message, got: %s", outputStr)
+		}
+	})
+
+	// Test advanced timestamp validation with truncation and multiple formats
+	t.Run("AdvancedTimestampValidation", func(t *testing.T) {
+		// Load test fixtures
+		if err := prepareTestDatabase(); err != nil {
+			t.Fatalf("Failed to prepare test database: %v", err)
+		}
+		
+		// Create test fixtures with different timestamp precision
+		advancedTimestampContent := `tables:
+  Products:
+    count: 3
+    order_by: "ProductID"
+    rows:
+      - ProductID: "prod-001"
+        Name: "Laptop Computer"
+        Price: 150000
+        IsActive: true
+        CategoryID: "cat-electronics"
+        CreatedAt: "2024-01-01T00:00:00Z"  # Exact match
+      - ProductID: "prod-002"
+        Name: "Wireless Mouse"
+        Price: 3000
+        IsActive: true
+        CategoryID: "cat-electronics"
+        CreatedAt: "2024-01-01T00:00:00.000Z"  # With milliseconds
+      - ProductID: "prod-003"
+        Name: "Coffee Mug"
+        Price: 1200
+        IsActive: false
+        CategoryID: "cat-kitchen"
+        CreatedAt: "2024-01-01T00:00:00+00:00"  # Different timezone format
+  Orders:
+    count: 3
+    order_by: "OrderID"
+    rows:
+      - OrderID: "order-001"
+        UserID: "user-001"
+        ProductID: "prod-001"
+        Quantity: 1
+        OrderDate: "2024-01-01T00:00:00Z"
+      - OrderID: "order-002"
+        UserID: "user-002"
+        ProductID: "prod-002"
+        Quantity: 2
+        OrderDate: "2024-01-01 00:00:00"  # Space separator format
+      - OrderID: "order-003"
+        UserID: "user-001"
+        ProductID: "prod-003"
+        Quantity: 1
+        OrderDate: "2024-01-01T00:00:00.000000Z"  # With microseconds
+`
+
+		advancedTimestampFile := "testdata/validation_advanced_timestamp.yaml"
+		if err := os.WriteFile(advancedTimestampFile, []byte(advancedTimestampContent), 0644); err != nil {
+			t.Fatalf("Failed to create advanced timestamp validation file: %v", err)
+		}
+		defer os.Remove(advancedTimestampFile)
+
+		cmd := exec.Command("./spalidate-test",
+			"--project", testProject,
+			"--instance", testInstance,
+			"--database", testDatabase,
+			"--port", "9010",
+			"--verbose",
+			advancedTimestampFile,
+		)
+
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("spalidate command failed: %v\nOutput: %s", err, string(output))
+		}
+
+		outputStr := string(output)
+		if !contains(outputStr, "✅ All validations passed!") {
+			t.Errorf("Expected successful validation message, got: %s", outputStr)
+		}
+		
+		// Check that timestamp fields were validated
+		if !contains(outputStr, "CreatedAt: value matches") || !contains(outputStr, "OrderDate: value matches") {
+			t.Errorf("Expected timestamp validation messages, got: %s", outputStr)
+		}
+	})
 }
 
 func waitForSpannerEmulator() error {
