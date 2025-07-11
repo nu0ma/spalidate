@@ -645,6 +645,78 @@ func TestComparisonOptions(t *testing.T) {
 	}
 }
 
+func TestCompareTimestampWithMultipleFormats(t *testing.T) {
+	baseTime := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name     string
+		options  ComparisonOptions
+		expected interface{}
+		actual   interface{}
+		want     bool
+	}{
+		{
+			name:     "RFC3339 with Z timezone",
+			options:  DefaultComparisonOptions(),
+			expected: "2024-01-01T00:00:00Z",
+			actual:   baseTime,
+			want:     true,
+		},
+		{
+			name:     "alternative format without T separator",
+			options:  DefaultComparisonOptions(),
+			expected: "2024-01-01 00:00:00",
+			actual:   baseTime,
+			want:     true,
+		},
+		{
+			name:     "without timezone suffix",
+			options:  DefaultComparisonOptions(),
+			expected: "2024-01-01T00:00:00",
+			actual:   baseTime,
+			want:     true,
+		},
+		{
+			name:     "date only format",
+			options:  DefaultComparisonOptions(),
+			expected: "2024-01-01",
+			actual:   baseTime,
+			want:     true,
+		},
+		{
+			name:     "timestamp with nanoseconds",
+			options:  DefaultComparisonOptions(),
+			expected: "2024-01-01T00:00:00.123456789Z",
+			actual:   time.Date(2024, 1, 1, 0, 0, 0, 123456789, time.UTC),
+			want:     true,
+		},
+		{
+			name:     "timestamp truncation to seconds",
+			options:  ComparisonOptions{TimestampTruncateTo: time.Second},
+			expected: "2024-01-01T00:00:00Z",
+			actual:   time.Date(2024, 1, 1, 0, 0, 0, 999999999, time.UTC),
+			want:     true,
+		},
+		{
+			name:     "timestamp truncation to minutes",
+			options:  ComparisonOptions{TimestampTruncateTo: time.Minute},
+			expected: "2024-01-01T00:00:00Z",
+			actual:   time.Date(2024, 1, 1, 0, 0, 59, 0, time.UTC),
+			want:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := NewWithOptions(nil, tt.options)
+			result := v.compareTimestamp(tt.expected, tt.actual)
+			if result != tt.want {
+				t.Errorf("compareTimestamp() = %v, want %v", result, tt.want)
+			}
+		})
+	}
+}
+
 func mustParseBigRat(s string) *big.Rat {
 	r, ok := new(big.Rat).SetString(s)
 	if !ok {
