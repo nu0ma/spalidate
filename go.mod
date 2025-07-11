@@ -1,6 +1,6 @@
 module github.com/nu0ma/spalidate
 
-go 1.24.3
+go 1.24.5
 
 require (
 	cloud.google.com/go v0.121.3
