@@ -23,9 +23,6 @@ import (
 
 const (
 	spannerEmulatorHost = "localhost:9010"
-	testProject         = "test-project"
-	testInstance        = "test-instance"
-	testDatabase        = "test-database"
 )
 
 func TestMain(m *testing.M) {
@@ -50,10 +47,6 @@ func TestMain(m *testing.M) {
 	// Run tests
 	code := m.Run()
 	os.Exit(code)
-}
-
-func prepareTestDatabase() error {
-	return testutil.LoadFixtures()
 }
 
 func waitForSpannerEmulator() error {
