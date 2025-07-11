@@ -1,0 +1,14 @@
+tables:
+  Orders:
+    count: 3
+    primary_key_columns: ["UserID", "ProductID"]
+    rows:
+      - UserID: "user-001"  # Different order than database
+        ProductID: "prod-001"
+        Quantity: 1
+      - UserID: "user-001"
+        ProductID: "prod-003"
+        Quantity: 1
+      - UserID: "user-002"
+        ProductID: "prod-002"
+        Quantity: 2

@@ -1,0 +1,20 @@
+tables:
+  Users:
+    count: 3
+    order_by: "UserID"
+    rows:
+      - UserID: "user-001"
+        Name: "Alice Johnson"
+        Email: "alice@example.com"
+        Status: 1
+        CreatedAt: "2024-01-01T00:00:00Z"  # RFC3339
+      - UserID: "user-002"
+        Name: "Bob Smith"
+        Email: "bob@example.com"
+        Status: 2
+        CreatedAt: "2024-01-01 00:00:00"  # Alternative format
+      - UserID: "user-003"
+        Name: "Charlie Brown"
+        Email: "charlie@example.com"
+        Status: 1
+        CreatedAt: "2024-01-01T00:00:00"  # Without timezone

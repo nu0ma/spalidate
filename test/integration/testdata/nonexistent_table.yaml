@@ -1,0 +1,5 @@
+tables:
+  NonExistentTable:
+    count: 1
+    columns:
+      ID: "test"
