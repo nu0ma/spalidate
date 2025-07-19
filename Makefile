@@ -26,10 +26,6 @@ setup-integration:
 	@echo "Waiting for Spanner emulator to be ready..."
 	@bash -c 'for i in {1..60}; do nc -z localhost 9010 && nc -z localhost 9020 && exit 0 || sleep 1; done; exit 1'
 	@echo "Spanner emulator is ready!"
-	@echo "Creating database schema..."
-	@echo "Setting up database via Go client with emulator..."
-	cd dbtest && SPANNER_EMULATOR_HOST=localhost:9010 go run setup-emulator.go || true
-	@echo "Database schema created (fixtures will be loaded by tests)"
 	@echo "Setup complete!"
 
 # Cleanup integration test environment
