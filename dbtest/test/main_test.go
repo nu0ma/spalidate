@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -23,6 +25,37 @@ import (
 const (
 	spannerEmulatorHost = "localhost:9010"
 )
+
+func loadSchemaStatements() ([]string, error) {
+	schemaPath := filepath.Join("..", "fixtures", "schema.sql")
+	content, err := os.ReadFile(schemaPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read schema file: %w", err)
+	}
+
+	// Remove comments first
+	lines := strings.Split(string(content), "\n")
+	var cleanLines []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" && !strings.HasPrefix(trimmed, "--") {
+			cleanLines = append(cleanLines, line)
+		}
+	}
+	cleanContent := strings.Join(cleanLines, "\n")
+
+	// Split by semicolon to get statements
+	statements := strings.Split(cleanContent, ";")
+	var result []string
+	for _, stmt := range statements {
+		trimmed := strings.TrimSpace(stmt)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	
+	return result, nil
+}
 
 func TestMain(m *testing.M) {
 	// Set environment variable for Spanner emulator
@@ -102,16 +135,17 @@ func setupSpannerInstance() error {
 	}
 	defer databaseAdminClient.Close()
 
+	// Load schema statements from file
+	schemaStatements, err := loadSchemaStatements()
+	if err != nil {
+		return fmt.Errorf("failed to load schema statements: %w", err)
+	}
+
 	// Create database
 	databaseReq := &databasepb.CreateDatabaseRequest{
 		Parent:          fmt.Sprintf("projects/%s/instances/%s", testProject, testInstance),
 		CreateStatement: fmt.Sprintf("CREATE DATABASE `%s`", testDatabase),
-		ExtraStatements: []string{
-			"CREATE TABLE Users (UserID STRING(36) NOT NULL, Name STRING(100) NOT NULL, Email STRING(255) NOT NULL, Status INT64 NOT NULL, CreatedAt TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true)) PRIMARY KEY (UserID)",
-			"CREATE TABLE Products (ProductID STRING(36) NOT NULL, Name STRING(200) NOT NULL, Price INT64 NOT NULL, IsActive BOOL NOT NULL, CategoryID STRING(36), CreatedAt TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true)) PRIMARY KEY (ProductID)",
-			"CREATE TABLE Orders (OrderID STRING(36) NOT NULL, UserID STRING(36) NOT NULL, ProductID STRING(36) NOT NULL, Quantity INT64 NOT NULL, OrderDate TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true)) PRIMARY KEY (UserID, ProductID), INTERLEAVE IN PARENT Users ON DELETE CASCADE",
-			"CREATE TABLE json (ID STRING(36) NOT NULL, Data STRING(MAX), Metadata STRING(MAX)) PRIMARY KEY (ID)",
-		},
+		ExtraStatements: schemaStatements,
 	}
 
 	databaseOp, err := databaseAdminClient.CreateDatabase(ctx, databaseReq)
