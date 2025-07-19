@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/nu0ma/spalidate/internal/config"
-	"github.com/nu0ma/spalidate/internal/spanner"
 	"github.com/nu0ma/spalidate/internal/validator"
 )
 
@@ -70,18 +69,16 @@ func main() {
 		log.Printf("Loaded config with %d tables", len(cfg.Tables))
 	}
 
-	spannerClient, err := spanner.NewClient(*project, *instance, *database, *port)
+	validator, err := validator.NewValidator(*project, *instance, *database, *port)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating Spanner client: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error creating validator: %v\n", err)
 		os.Exit(1)
 	}
-	defer spannerClient.Close()
+	defer validator.Close()
 
 	if *verbose {
 		log.Println("Connected to Spanner")
 	}
-
-	validator := validator.New(spannerClient)
 
 	results, err := validator.Validate(cfg)
 	if err != nil {

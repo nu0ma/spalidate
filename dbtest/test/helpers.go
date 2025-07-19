@@ -4,6 +4,7 @@
 package integration
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"os"
@@ -11,7 +12,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nu0ma/spalidate/internal/testutil"
 	_ "github.com/googleapis/go-sql-spanner"
 )
 
@@ -98,7 +98,7 @@ func prepareTestDatabase(t *testing.T) error {
 
 	// Load test data from SQL file
 	sqlFilePath := filepath.Join("..", "fixtures", "data.sql")
-	testutil.LoadSQLInBatchesBySplitter(t, db, sqlFilePath, []byte(";\n"))
+	loadSQLInBatchesBySplitter(t, db, sqlFilePath, []byte(";\n"))
 	
 	return nil
 }
@@ -190,4 +190,50 @@ func findSubstring(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+// SQL loading utilities (moved from internal/testutil)
+
+// loadTestDataFromSQL loads test data from a single SQL file
+func loadTestDataFromSQL(t *testing.T, db *sql.DB, sqlFilePath string) {
+	t.Helper()
+	
+	sqlContent, err := os.ReadFile(sqlFilePath)
+	if err != nil {
+		t.Fatalf("cannot read SQL file: %v", err)
+	}
+	
+	if _, err := db.Exec(string(sqlContent)); err != nil {
+		t.Fatalf("cannot execute SQL: %v", err)
+	}
+}
+
+// loadSQLInBatchesBySplitter splits SQL file by delimiter and executes in batches
+func loadSQLInBatchesBySplitter(t *testing.T, db *sql.DB, sqlFilePath string, splitter []byte) {
+	t.Helper()
+	
+	sqlContent, err := os.ReadFile(sqlFilePath)
+	if err != nil {
+		t.Errorf("cannot read SQL file: %v", err)
+		return
+	}
+	
+	batches := bytes.Split(sqlContent, splitter)
+	loadSQLInBatches(t, db, batches)
+}
+
+// loadSQLInBatches executes SQL statements in batches
+func loadSQLInBatches(t *testing.T, db *sql.DB, batches [][]byte) {
+	t.Helper()
+	
+	for _, batch := range batches {
+		if len(batch) == 0 {
+			continue
+		}
+		
+		if _, err := db.Exec(string(batch)); err != nil {
+			t.Errorf("cannot execute SQL batch: %v", err)
+			return
+		}
+	}
 }

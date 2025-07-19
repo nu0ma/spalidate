@@ -1,6 +1,7 @@
 package validator
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -10,9 +11,22 @@ import (
 	"strings"
 	"time"
 
+	"cloud.google.com/go/civil"
+	"cloud.google.com/go/spanner"
+	"google.golang.org/api/iterator"
+	sppb "google.golang.org/genproto/googleapis/spanner/v1"
+
 	"github.com/nu0ma/spalidate/internal/config"
-	"github.com/nu0ma/spalidate/internal/spanner"
 )
+
+// Row represents a database row as a map of column names to values
+type Row map[string]interface{}
+
+// spannerClient wraps the Spanner client functionality
+type spannerClient struct {
+	client   *spanner.Client
+	database string
+}
 
 // ComparisonOptions defines options for value comparison
 type ComparisonOptions struct {
@@ -33,8 +47,8 @@ func DefaultComparisonOptions() ComparisonOptions {
 }
 
 type Validator struct {
-	client  *spanner.Client
-	options ComparisonOptions
+	spannerClient *spannerClient
+	options       ComparisonOptions
 }
 
 type ValidationResult struct {
@@ -54,17 +68,76 @@ func (r *ValidationResult) AddMessage(msg string) {
 	r.Messages = append(r.Messages, msg)
 }
 
-func New(client *spanner.Client) *Validator {
+// newSpannerClient creates a new Spanner client wrapper
+func newSpannerClient(project, instance, database string, port int) (*spannerClient, error) {
+	ctx := context.Background()
+
+	databasePath := fmt.Sprintf("projects/%s/instances/%s/databases/%s", project, instance, database)
+
+	client, err := spanner.NewClient(ctx, databasePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Spanner client: %w", err)
+	}
+
+	return &spannerClient{
+		client:   client,
+		database: databasePath,
+	}, nil
+}
+
+// NewValidator creates a new validator with a Spanner client
+func NewValidator(project, instance, database string, port int) (*Validator, error) {
+	client, err := newSpannerClient(project, instance, database, port)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Validator{
-		client:  client,
-		options: DefaultComparisonOptions(),
+		spannerClient: client,
+		options:       DefaultComparisonOptions(),
+	}, nil
+}
+
+// NewValidatorWithOptions creates a new validator with custom options
+func NewValidatorWithOptions(project, instance, database string, port int, options ComparisonOptions) (*Validator, error) {
+	client, err := newSpannerClient(project, instance, database, port)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Validator{
+		spannerClient: client,
+		options:       options,
+	}, nil
+}
+
+// Legacy constructors for backward compatibility
+func New(client *spanner.Client) *Validator {
+	spannerClient := &spannerClient{
+		client:   client,
+		database: "", // Will be determined from client if needed
+	}
+	return &Validator{
+		spannerClient: spannerClient,
+		options:       DefaultComparisonOptions(),
 	}
 }
 
 func NewWithOptions(client *spanner.Client, options ComparisonOptions) *Validator {
+	spannerClient := &spannerClient{
+		client:   client,
+		database: "", // Will be determined from client if needed
+	}
 	return &Validator{
-		client:  client,
-		options: options,
+		spannerClient: spannerClient,
+		options:       options,
+	}
+}
+
+// Close closes the underlying Spanner client
+func (v *Validator) Close() {
+	if v.spannerClient != nil && v.spannerClient.client != nil {
+		v.spannerClient.client.Close()
 	}
 }
 
@@ -81,7 +154,7 @@ func (v *Validator) Validate(cfg *config.Config) (*ValidationResult, error) {
 }
 
 func (v *Validator) validateTable(tableName string, tableConfig config.TableConfig, result *ValidationResult) error {
-	exists, err := v.client.TableExists(tableName)
+	exists, err := v.spannerClient.tableExists(tableName)
 	if err != nil {
 		return fmt.Errorf("failed to check table existence: %w", err)
 	}
@@ -91,7 +164,7 @@ func (v *Validator) validateTable(tableName string, tableConfig config.TableConf
 		return nil
 	}
 
-	actualCount, err := v.client.CountRows(tableName)
+	actualCount, err := v.spannerClient.countRows(tableName)
 	if err != nil {
 		return fmt.Errorf("failed to count rows: %w", err)
 	}
@@ -113,7 +186,7 @@ func (v *Validator) validateTable(tableName string, tableConfig config.TableConf
 
 func (v *Validator) validateColumns(tableName string, tableConfig config.TableConfig, result *ValidationResult) error {
 	columnNames := tableConfig.GetColumnNames()
-	rows, err := v.client.QueryRowsWithOrder(tableName, columnNames, tableConfig.OrderBy)
+	rows, err := v.spannerClient.queryRowsWithOrder(tableName, columnNames, tableConfig.OrderBy)
 	if err != nil {
 		return fmt.Errorf("failed to query rows: %w", err)
 	}
@@ -152,7 +225,7 @@ func (v *Validator) validateColumns(tableName string, tableConfig config.TableCo
 	return nil
 }
 
-func (v *Validator) validateMultipleRows(tableName string, tableConfig config.TableConfig, rows []spanner.Row, result *ValidationResult) error {
+func (v *Validator) validateMultipleRows(tableName string, tableConfig config.TableConfig, rows []Row, result *ValidationResult) error {
 	// If primary key columns are specified, use primary key-based comparison
 	if len(tableConfig.PrimaryKeyColumns) > 0 {
 		return v.validateRowsByPrimaryKey(tableName, tableConfig, rows, result)
@@ -163,7 +236,7 @@ func (v *Validator) validateMultipleRows(tableName string, tableConfig config.Ta
 }
 
 // validateRowsByPrimaryKey implements primary key-based row comparison
-func (v *Validator) validateRowsByPrimaryKey(tableName string, tableConfig config.TableConfig, rows []spanner.Row, result *ValidationResult) error {
+func (v *Validator) validateRowsByPrimaryKey(tableName string, tableConfig config.TableConfig, rows []Row, result *ValidationResult) error {
 	// Build map of expected rows keyed by primary key
 	expectedRowMap := make(map[string]map[string]interface{})
 	for _, expectedRow := range tableConfig.Rows {
@@ -176,7 +249,7 @@ func (v *Validator) validateRowsByPrimaryKey(tableName string, tableConfig confi
 	}
 
 	// Build map of actual rows keyed by primary key
-	actualRowMap := make(map[string]spanner.Row)
+	actualRowMap := make(map[string]Row)
 	for _, actualRow := range rows {
 		primaryKey := v.buildPrimaryKey(actualRow, tableConfig.PrimaryKeyColumns)
 		if primaryKey == "" {
@@ -211,7 +284,7 @@ func (v *Validator) validateRowsByPrimaryKey(tableName string, tableConfig confi
 }
 
 // validateRowsByOrder implements the original order-based row comparison
-func (v *Validator) validateRowsByOrder(tableName string, tableConfig config.TableConfig, rows []spanner.Row, result *ValidationResult) error {
+func (v *Validator) validateRowsByOrder(tableName string, tableConfig config.TableConfig, rows []Row, result *ValidationResult) error {
 	for i, expectedRow := range tableConfig.Rows {
 		if i >= len(rows) {
 			result.AddError(fmt.Sprintf("Table %s: expected row %d but only %d rows found", tableName, i+1, len(rows)))
@@ -239,7 +312,7 @@ func (v *Validator) buildPrimaryKey(row map[string]interface{}, primaryKeyColumn
 }
 
 // compareRowValues compares individual column values between expected and actual rows
-func (v *Validator) compareRowValues(tableName, rowIdentifier string, expectedRow map[string]interface{}, actualRow spanner.Row, result *ValidationResult) {
+func (v *Validator) compareRowValues(tableName, rowIdentifier string, expectedRow map[string]interface{}, actualRow Row, result *ValidationResult) {
 	for columnName, expectedValue := range expectedRow {
 		actualValue, exists := actualRow[columnName]
 		if !exists {
@@ -607,4 +680,165 @@ func (v *Validator) compareIntegerConversions(expected, actual interface{}) bool
 	}
 
 	return expectedInt == actualInt
+}
+
+// Spanner client methods (moved from internal/spanner)
+
+func (c *spannerClient) countRows(tableName string) (int, error) {
+	ctx := context.Background()
+
+	query := fmt.Sprintf("SELECT COUNT(*) as count FROM %s", tableName)
+	stmt := spanner.Statement{SQL: query}
+
+	iter := c.client.Single().Query(ctx, stmt)
+	defer iter.Stop()
+
+	row, err := iter.Next()
+	if err != nil {
+		return 0, fmt.Errorf("failed to count rows in table %s: %w", tableName, err)
+	}
+
+	var count int64
+	if err := row.Columns(&count); err != nil {
+		return 0, fmt.Errorf("failed to scan count: %w", err)
+	}
+
+	return int(count), nil
+}
+
+func (c *spannerClient) queryRows(tableName string, columns []string) ([]Row, error) {
+	return c.queryRowsWithOrder(tableName, columns, "")
+}
+
+func (c *spannerClient) queryRowsWithOrder(tableName string, columns []string, orderBy string) ([]Row, error) {
+	ctx := context.Background()
+
+	columnList := "*"
+	if len(columns) > 0 {
+		columnList = ""
+		for i, col := range columns {
+			if i > 0 {
+				columnList += ", "
+			}
+			columnList += col
+		}
+	}
+
+	query := fmt.Sprintf("SELECT %s FROM %s", columnList, tableName)
+	if orderBy != "" {
+		query += fmt.Sprintf(" ORDER BY %s", orderBy)
+	}
+	stmt := spanner.Statement{SQL: query}
+
+	iter := c.client.Single().Query(ctx, stmt)
+	defer iter.Stop()
+
+	var rows []Row
+	for {
+		row, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to iterate rows: %w", err)
+		}
+
+		rowData := make(Row)
+		columnNames := row.ColumnNames()
+
+		// Use GenericColumnValue for proper type handling
+		for i := 0; i < row.Size(); i++ {
+			var col spanner.GenericColumnValue
+			if err := row.Column(i, &col); err != nil {
+				return nil, fmt.Errorf("failed to read column %d: %w", i, err)
+			}
+
+			// GenericColumnValue handles NULL internally during Decode
+
+			// Decode based on the actual type
+			switch col.Type.Code {
+			case sppb.TypeCode_INT64:
+				var v int64
+				if err := col.Decode(&v); err != nil {
+					return nil, fmt.Errorf("failed to decode int64: %w", err)
+				}
+				rowData[columnNames[i]] = v
+			case sppb.TypeCode_STRING:
+				var v string
+				if err := col.Decode(&v); err != nil {
+					return nil, fmt.Errorf("failed to decode string: %w", err)
+				}
+				rowData[columnNames[i]] = v
+			case sppb.TypeCode_FLOAT64:
+				var v float64
+				if err := col.Decode(&v); err != nil {
+					return nil, fmt.Errorf("failed to decode float64: %w", err)
+				}
+				rowData[columnNames[i]] = v
+			case sppb.TypeCode_BOOL:
+				var v bool
+				if err := col.Decode(&v); err != nil {
+					return nil, fmt.Errorf("failed to decode bool: %w", err)
+				}
+				rowData[columnNames[i]] = v
+			case sppb.TypeCode_BYTES:
+				var v []byte
+				if err := col.Decode(&v); err != nil {
+					return nil, fmt.Errorf("failed to decode bytes: %w", err)
+				}
+				rowData[columnNames[i]] = v
+			case sppb.TypeCode_TIMESTAMP:
+				var v time.Time
+				if err := col.Decode(&v); err != nil {
+					return nil, fmt.Errorf("failed to decode timestamp: %w", err)
+				}
+				rowData[columnNames[i]] = v
+			case sppb.TypeCode_DATE:
+				var v civil.Date
+				if err := col.Decode(&v); err != nil {
+					return nil, fmt.Errorf("failed to decode date: %w", err)
+				}
+				rowData[columnNames[i]] = v
+			default:
+				// For unknown types, store the raw value
+				rowData[columnNames[i]] = col.Value
+			}
+		}
+
+		rows = append(rows, rowData)
+	}
+
+	return rows, nil
+}
+
+func (c *spannerClient) tableExists(tableName string) (bool, error) {
+	ctx := context.Background()
+
+	query := `
+		SELECT COUNT(*) as count 
+		FROM INFORMATION_SCHEMA.TABLES 
+		WHERE TABLE_NAME = @tableName
+	`
+
+	stmt := spanner.Statement{
+		SQL: query,
+		Params: map[string]interface{}{
+			"tableName": tableName,
+		},
+	}
+
+	iter := c.client.Single().Query(ctx, stmt)
+	defer iter.Stop()
+
+	row, err := iter.Next()
+	if err != nil {
+		return false, fmt.Errorf("failed to check table existence: %w", err)
+	}
+
+	var count int64
+	if err := row.Columns(&count); err != nil {
+		return false, fmt.Errorf("failed to scan table count: %w", err)
+	}
+
+	return count > 0, nil
 }

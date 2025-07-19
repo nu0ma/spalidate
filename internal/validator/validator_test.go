@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/nu0ma/spalidate/internal/config"
-	"github.com/nu0ma/spalidate/internal/spanner"
 )
 
 func TestValidationResult(t *testing.T) {
@@ -118,7 +117,7 @@ func TestValidateMultipleRowsByPrimaryKey(t *testing.T) {
 	tests := []struct {
 		name        string
 		tableConfig config.TableConfig
-		rows        []spanner.Row
+		rows        []Row
 		wantErrors  bool
 		errorCount  int
 	}{
@@ -131,7 +130,7 @@ func TestValidateMultipleRowsByPrimaryKey(t *testing.T) {
 					{"ID": "2", "Name": "Bob"},
 				},
 			},
-			rows: []spanner.Row{
+			rows: []Row{
 				{"ID": "2", "Name": "Bob"},
 				{"ID": "1", "Name": "Alice"},
 			},
@@ -146,7 +145,7 @@ func TestValidateMultipleRowsByPrimaryKey(t *testing.T) {
 					{"ID": "2", "Name": "Bob"},
 				},
 			},
-			rows: []spanner.Row{
+			rows: []Row{
 				{"ID": "1", "Name": "Alice"},
 			},
 			wantErrors: true,
@@ -160,7 +159,7 @@ func TestValidateMultipleRowsByPrimaryKey(t *testing.T) {
 					{"ID": "1", "Name": "Alice"},
 				},
 			},
-			rows: []spanner.Row{
+			rows: []Row{
 				{"ID": "1", "Name": "Alice"},
 				{"ID": "2", "Name": "Bob"},
 			},
@@ -175,7 +174,7 @@ func TestValidateMultipleRowsByPrimaryKey(t *testing.T) {
 					{"ID": "1", "Name": "Alice"},
 				},
 			},
-			rows: []spanner.Row{
+			rows: []Row{
 				{"ID": "1", "Name": "Bob"}, // Wrong name
 			},
 			wantErrors: true,
@@ -190,7 +189,7 @@ func TestValidateMultipleRowsByPrimaryKey(t *testing.T) {
 					{"UserID": "1", "OrderID": "B", "Amount": 200},
 				},
 			},
-			rows: []spanner.Row{
+			rows: []Row{
 				{"UserID": "1", "OrderID": "B", "Amount": 200},
 				{"UserID": "1", "OrderID": "A", "Amount": 100},
 			},
@@ -731,7 +730,7 @@ func TestNew(t *testing.T) {
 		t.Error("New() should return a non-nil validator")
 		return
 	}
-	if v.client != nil {
+	if v.spannerClient.client != nil {
 		t.Error("Validator client should be nil when passed nil")
 	}
 
