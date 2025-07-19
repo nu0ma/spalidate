@@ -155,7 +155,7 @@ func AssertCommandFailure(t *testing.T, output []byte, err error) {
 
 // GetTestDataPath returns the path to a test data file
 func GetTestDataPath(filename string) string {
-	return filepath.Join("testdata", filename)
+	return filepath.Join("expected", filename)
 }
 
 // CreateTempValidationFile creates a temporary validation file with the given content
