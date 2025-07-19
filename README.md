@@ -2,6 +2,8 @@
 
 A command-line tool for validating data in Google Cloud Spanner emulator against YAML configuration files.
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/nu0ma/spalidate)
+
 ## Installation
 
 ```bash
