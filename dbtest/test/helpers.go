@@ -97,7 +97,7 @@ func prepareTestDatabase(t *testing.T) error {
 	defer db.Close()
 
 	// Load test data from SQL file
-	sqlFilePath := filepath.Join("..", "fixtures", "all_fixtures.sql")
+	sqlFilePath := filepath.Join("..", "fixtures", "data.sql")
 	testutil.LoadSQLInBatchesBySplitter(t, db, sqlFilePath, []byte(";\n"))
 	
 	return nil

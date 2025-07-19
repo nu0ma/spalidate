@@ -10,7 +10,7 @@ test-unit:
 # Integration tests
 test-integration: setup-integration
 	@echo "Running integration tests..."
-	cd test/integration && SPANNER_EMULATOR_HOST=localhost:9010 go test -v -tags=integration ./...
+	cd dbtest/test && SPANNER_EMULATOR_HOST=localhost:9010 go test -v -tags=integration ./...
 	@$(MAKE) cleanup-integration
 
 # Setup integration test environment
@@ -28,7 +28,7 @@ setup-integration:
 	@echo "Spanner emulator is ready!"
 	@echo "Creating database schema..."
 	@echo "Setting up database via Go client with emulator..."
-	cd scripts && SPANNER_EMULATOR_HOST=localhost:9010 go run setup-emulator.go || true
+	cd dbtest && SPANNER_EMULATOR_HOST=localhost:9010 go run setup-emulator.go || true
 	@echo "Database schema created (fixtures will be loaded by tests)"
 	@echo "Setup complete!"
 

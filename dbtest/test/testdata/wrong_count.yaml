@@ -1,0 +1,7 @@
+tables:
+  Users:
+    count: 5  # Wrong count (actual is 3)
+    order_by: "UserID"
+    columns:
+      UserID: "user-001"
+      Name: "Alice Johnson"
