@@ -15,7 +15,6 @@ import (
 	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	instance "cloud.google.com/go/spanner/admin/instance/apiv1"
 	"cloud.google.com/go/spanner/admin/instance/apiv1/instancepb"
-	"github.com/nu0ma/spalidate/internal/testutil"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -39,10 +38,6 @@ func TestMain(m *testing.M) {
 		panic("Failed to setup Spanner instance: " + err.Error())
 	}
 
-	// Initialize fixtures
-	if err := testutil.InitFixtures(testProject, testInstance, testDatabase); err != nil {
-		panic("Failed to initialize fixtures: " + err.Error())
-	}
 
 	// Run tests
 	code := m.Run()

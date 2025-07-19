@@ -4,12 +4,15 @@
 package integration
 
 import (
+	"database/sql"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 
 	"github.com/nu0ma/spalidate/internal/testutil"
+	_ "github.com/googleapis/go-sql-spanner"
 )
 
 const (
@@ -58,7 +61,7 @@ func RunSpalidate(t *testing.T, config *TestConfig) ([]byte, error) {
 	t.Helper()
 
 	// Prepare test database
-	if err := prepareTestDatabase(); err != nil {
+	if err := prepareTestDatabase(t); err != nil {
 		t.Fatalf("Failed to prepare test database: %v", err)
 	}
 
@@ -84,8 +87,20 @@ func RunSpalidate(t *testing.T, config *TestConfig) ([]byte, error) {
 }
 
 // prepareTestDatabase prepares the test database with fixtures
-func prepareTestDatabase() error {
-	return testutil.LoadFixtures()
+func prepareTestDatabase(t *testing.T) error {
+	// Open database connection
+	dsn := fmt.Sprintf("projects/%s/instances/%s/databases/%s", testProject, testInstance, testDatabase)
+	db, err := sql.Open("spanner", dsn)
+	if err != nil {
+		return fmt.Errorf("failed to open database: %w", err)
+	}
+	defer db.Close()
+
+	// Load test data from SQL file
+	sqlFilePath := filepath.Join("..", "fixtures", "all_fixtures.sql")
+	testutil.LoadSQLInBatchesBySplitter(t, db, sqlFilePath, []byte(";\n"))
+	
+	return nil
 }
 
 // BuildSpalidate builds the spalidate binary for testing
