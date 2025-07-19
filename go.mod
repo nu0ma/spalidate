@@ -5,7 +5,6 @@ go 1.24.5
 require (
 	cloud.google.com/go v0.121.3
 	cloud.google.com/go/spanner v1.83.0
-	github.com/go-testfixtures/testfixtures/v3 v3.16.0
 	github.com/googleapis/go-sql-spanner v1.16.0
 	google.golang.org/api v0.240.0
 	google.golang.org/genproto v0.0.0-20250505200425-f936aa4a68b2
@@ -31,7 +30,6 @@ require (
 	github.com/go-jose/go-jose/v4 v4.1.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/goccy/go-yaml v1.17.1 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/google/uuid v1.6.0 // indirect

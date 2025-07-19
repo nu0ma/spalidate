@@ -4,12 +4,15 @@
 package integration
 
 import (
+	"bytes"
+	"database/sql"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 
-	"github.com/nu0ma/spalidate/internal/testutil"
+	_ "github.com/googleapis/go-sql-spanner"
 )
 
 const (
@@ -58,7 +61,7 @@ func RunSpalidate(t *testing.T, config *TestConfig) ([]byte, error) {
 	t.Helper()
 
 	// Prepare test database
-	if err := prepareTestDatabase(); err != nil {
+	if err := prepareTestDatabase(t); err != nil {
 		t.Fatalf("Failed to prepare test database: %v", err)
 	}
 
@@ -84,8 +87,20 @@ func RunSpalidate(t *testing.T, config *TestConfig) ([]byte, error) {
 }
 
 // prepareTestDatabase prepares the test database with fixtures
-func prepareTestDatabase() error {
-	return testutil.LoadFixtures()
+func prepareTestDatabase(t *testing.T) error {
+	// Open database connection
+	dsn := fmt.Sprintf("projects/%s/instances/%s/databases/%s", testProject, testInstance, testDatabase)
+	db, err := sql.Open("spanner", dsn)
+	if err != nil {
+		return fmt.Errorf("failed to open database: %w", err)
+	}
+	defer db.Close()
+
+	// Load test data from SQL file
+	sqlFilePath := filepath.Join("..", "fixtures", "data.sql")
+	loadSQLInBatchesBySplitter(t, db, sqlFilePath, []byte(";\n"))
+	
+	return nil
 }
 
 // BuildSpalidate builds the spalidate binary for testing
@@ -140,7 +155,7 @@ func AssertCommandFailure(t *testing.T, output []byte, err error) {
 
 // GetTestDataPath returns the path to a test data file
 func GetTestDataPath(filename string) string {
-	return filepath.Join("testdata", filename)
+	return filepath.Join("expected", filename)
 }
 
 // CreateTempValidationFile creates a temporary validation file with the given content
@@ -175,4 +190,50 @@ func findSubstring(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+// SQL loading utilities (moved from internal/testutil)
+
+// loadTestDataFromSQL loads test data from a single SQL file
+func loadTestDataFromSQL(t *testing.T, db *sql.DB, sqlFilePath string) {
+	t.Helper()
+	
+	sqlContent, err := os.ReadFile(sqlFilePath)
+	if err != nil {
+		t.Fatalf("cannot read SQL file: %v", err)
+	}
+	
+	if _, err := db.Exec(string(sqlContent)); err != nil {
+		t.Fatalf("cannot execute SQL: %v", err)
+	}
+}
+
+// loadSQLInBatchesBySplitter splits SQL file by delimiter and executes in batches
+func loadSQLInBatchesBySplitter(t *testing.T, db *sql.DB, sqlFilePath string, splitter []byte) {
+	t.Helper()
+	
+	sqlContent, err := os.ReadFile(sqlFilePath)
+	if err != nil {
+		t.Errorf("cannot read SQL file: %v", err)
+		return
+	}
+	
+	batches := bytes.Split(sqlContent, splitter)
+	loadSQLInBatches(t, db, batches)
+}
+
+// loadSQLInBatches executes SQL statements in batches
+func loadSQLInBatches(t *testing.T, db *sql.DB, batches [][]byte) {
+	t.Helper()
+	
+	for _, batch := range batches {
+		if len(batch) == 0 {
+			continue
+		}
+		
+		if _, err := db.Exec(string(batch)); err != nil {
+			t.Errorf("cannot execute SQL batch: %v", err)
+			return
+		}
+	}
 }

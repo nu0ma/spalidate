@@ -20,4 +20,4 @@ jobs:
         go-version: '1.24'
     
     - name: Run all tests
-      run: make test-integration
+      run: make test
