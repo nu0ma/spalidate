@@ -8,8 +8,8 @@ import (
 
 	"cloud.google.com/go/civil"
 	"cloud.google.com/go/spanner"
+	"cloud.google.com/go/spanner/apiv1/spannerpb"
 	"google.golang.org/api/iterator"
-	sppb "google.golang.org/genproto/googleapis/spanner/v1"
 )
 
 type spannerClient struct {
@@ -103,43 +103,43 @@ func (c *spannerClient) queryRowsWithOrder(tableName string, columns []string, o
 			}
 
 			switch col.Type.Code {
-			case sppb.TypeCode_INT64:
+			case spannerpb.TypeCode_INT64:
 				var v int64
 				if err := col.Decode(&v); err != nil {
 					return nil, fmt.Errorf("failed to decode int64: %w", err)
 				}
 				rowData[columnNames[i]] = v
-			case sppb.TypeCode_STRING:
+			case spannerpb.TypeCode_STRING:
 				var v string
 				if err := col.Decode(&v); err != nil {
 					return nil, fmt.Errorf("failed to decode string: %w", err)
 				}
 				rowData[columnNames[i]] = v
-			case sppb.TypeCode_FLOAT64:
+			case spannerpb.TypeCode_FLOAT64:
 				var v float64
 				if err := col.Decode(&v); err != nil {
 					return nil, fmt.Errorf("failed to decode float64: %w", err)
 				}
 				rowData[columnNames[i]] = v
-			case sppb.TypeCode_BOOL:
+			case spannerpb.TypeCode_BOOL:
 				var v bool
 				if err := col.Decode(&v); err != nil {
 					return nil, fmt.Errorf("failed to decode bool: %w", err)
 				}
 				rowData[columnNames[i]] = v
-			case sppb.TypeCode_BYTES:
+			case spannerpb.TypeCode_BYTES:
 				var v []byte
 				if err := col.Decode(&v); err != nil {
 					return nil, fmt.Errorf("failed to decode bytes: %w", err)
 				}
 				rowData[columnNames[i]] = v
-			case sppb.TypeCode_TIMESTAMP:
+			case spannerpb.TypeCode_TIMESTAMP:
 				var v time.Time
 				if err := col.Decode(&v); err != nil {
 					return nil, fmt.Errorf("failed to decode timestamp: %w", err)
 				}
 				rowData[columnNames[i]] = v
-			case sppb.TypeCode_DATE:
+			case spannerpb.TypeCode_DATE:
 				var v civil.Date
 				if err := col.Decode(&v); err != nil {
 					return nil, fmt.Errorf("failed to decode date: %w", err)
