@@ -4,7 +4,6 @@
 package integration
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -34,14 +33,27 @@ func loadSchemaStatements() ([]string, error) {
 		return nil, fmt.Errorf("failed to read schema file: %w", err)
 	}
 
-	statements := bytes.Split(content, []byte(";"))
+	// Remove comments first
+	lines := strings.Split(string(content), "\n")
+	var cleanLines []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" && !strings.HasPrefix(trimmed, "--") {
+			cleanLines = append(cleanLines, line)
+		}
+	}
+	cleanContent := strings.Join(cleanLines, "\n")
+
+	// Split by semicolon to get statements
+	statements := strings.Split(cleanContent, ";")
 	var result []string
 	for _, stmt := range statements {
-		trimmed := strings.TrimSpace(string(stmt))
-		if trimmed != "" && !strings.HasPrefix(trimmed, "--") {
+		trimmed := strings.TrimSpace(stmt)
+		if trimmed != "" {
 			result = append(result, trimmed)
 		}
 	}
+	
 	return result, nil
 }
 
