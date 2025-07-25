@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"cloud.google.com/go/civil"
+	"cloud.google.com/go/spanner"
 	"github.com/nu0ma/spalidate/internal/config"
 )
 
@@ -738,5 +740,312 @@ func TestNew(t *testing.T) {
 	defaultOpts := DefaultComparisonOptions()
 	if v.options.FloatTolerance != defaultOpts.FloatTolerance {
 		t.Errorf("Expected default FloatTolerance, got %v", v.options.FloatTolerance)
+	}
+}
+
+func TestCompareNullString(t *testing.T) {
+	v := &Validator{}
+
+	tests := []struct {
+		name     string
+		expected interface{}
+		actual   interface{}
+		want     bool
+	}{
+		{
+			name:     "null value match",
+			expected: nil,
+			actual:   spanner.NullString{Valid: false},
+			want:     true,
+		},
+		{
+			name:     "valid string match",
+			expected: "test",
+			actual:   spanner.NullString{StringVal: "test", Valid: true},
+			want:     true,
+		},
+		{
+			name:     "valid string mismatch",
+			expected: "test1",
+			actual:   spanner.NullString{StringVal: "test2", Valid: true},
+			want:     false,
+		},
+		{
+			name:     "null vs valid",
+			expected: nil,
+			actual:   spanner.NullString{StringVal: "test", Valid: true},
+			want:     false,
+		},
+		{
+			name:     "spanner.NullString to spanner.NullString",
+			expected: spanner.NullString{StringVal: "test", Valid: true},
+			actual:   spanner.NullString{StringVal: "test", Valid: true},
+			want:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := v.compareNullString(tt.expected, tt.actual)
+			if got != tt.want {
+				t.Errorf("compareNullString(%v, %v) = %v, want %v", tt.expected, tt.actual, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCompareNullInt64(t *testing.T) {
+	v := &Validator{}
+
+	tests := []struct {
+		name     string
+		expected interface{}
+		actual   interface{}
+		want     bool
+	}{
+		{
+			name:     "null value match",
+			expected: nil,
+			actual:   spanner.NullInt64{Valid: false},
+			want:     true,
+		},
+		{
+			name:     "valid int64 match",
+			expected: int64(42),
+			actual:   spanner.NullInt64{Int64: 42, Valid: true},
+			want:     true,
+		},
+		{
+			name:     "valid int match",
+			expected: 42,
+			actual:   spanner.NullInt64{Int64: 42, Valid: true},
+			want:     true,
+		},
+		{
+			name:     "valid int mismatch",
+			expected: 42,
+			actual:   spanner.NullInt64{Int64: 43, Valid: true},
+			want:     false,
+		},
+		{
+			name:     "spanner.NullInt64 to spanner.NullInt64",
+			expected: spanner.NullInt64{Int64: 42, Valid: true},
+			actual:   spanner.NullInt64{Int64: 42, Valid: true},
+			want:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := v.compareNullInt64(tt.expected, tt.actual)
+			if got != tt.want {
+				t.Errorf("compareNullInt64(%v, %v) = %v, want %v", tt.expected, tt.actual, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCompareNullBool(t *testing.T) {
+	v := &Validator{}
+
+	tests := []struct {
+		name     string
+		expected interface{}
+		actual   interface{}
+		want     bool
+	}{
+		{
+			name:     "null value match",
+			expected: nil,
+			actual:   spanner.NullBool{Valid: false},
+			want:     true,
+		},
+		{
+			name:     "valid bool true match",
+			expected: true,
+			actual:   spanner.NullBool{Bool: true, Valid: true},
+			want:     true,
+		},
+		{
+			name:     "valid bool false match",
+			expected: false,
+			actual:   spanner.NullBool{Bool: false, Valid: true},
+			want:     true,
+		},
+		{
+			name:     "valid bool mismatch",
+			expected: true,
+			actual:   spanner.NullBool{Bool: false, Valid: true},
+			want:     false,
+		},
+		{
+			name:     "spanner.NullBool to spanner.NullBool",
+			expected: spanner.NullBool{Bool: true, Valid: true},
+			actual:   spanner.NullBool{Bool: true, Valid: true},
+			want:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := v.compareNullBool(tt.expected, tt.actual)
+			if got != tt.want {
+				t.Errorf("compareNullBool(%v, %v) = %v, want %v", tt.expected, tt.actual, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCompareNullFloat64(t *testing.T) {
+	tests := []struct {
+		name     string
+		options  ComparisonOptions
+		expected interface{}
+		actual   interface{}
+		want     bool
+	}{
+		{
+			name:     "null value match",
+			options:  DefaultComparisonOptions(),
+			expected: nil,
+			actual:   spanner.NullFloat64{Valid: false},
+			want:     true,
+		},
+		{
+			name:     "valid float64 match",
+			options:  DefaultComparisonOptions(),
+			expected: 3.14,
+			actual:   spanner.NullFloat64{Float64: 3.14, Valid: true},
+			want:     true,
+		},
+		{
+			name:     "valid float64 with tolerance",
+			options:  ComparisonOptions{FloatTolerance: 0.01},
+			expected: 3.14,
+			actual:   spanner.NullFloat64{Float64: 3.141, Valid: true},
+			want:     true,
+		},
+		{
+			name:     "valid float64 outside tolerance",
+			options:  ComparisonOptions{FloatTolerance: 0.001},
+			expected: 3.14,
+			actual:   spanner.NullFloat64{Float64: 3.15, Valid: true},
+			want:     false,
+		},
+		{
+			name:     "spanner.NullFloat64 to spanner.NullFloat64",
+			options:  DefaultComparisonOptions(),
+			expected: spanner.NullFloat64{Float64: 3.14, Valid: true},
+			actual:   spanner.NullFloat64{Float64: 3.14, Valid: true},
+			want:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := NewWithOptions(nil, tt.options)
+			got := v.compareNullFloat64(tt.expected, tt.actual)
+			if got != tt.want {
+				t.Errorf("compareNullFloat64(%v, %v) = %v, want %v", tt.expected, tt.actual, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCompareNullDate(t *testing.T) {
+	v := &Validator{}
+	testDate := civil.Date{Year: 2024, Month: 1, Day: 15}
+
+	tests := []struct {
+		name     string
+		expected interface{}
+		actual   interface{}
+		want     bool
+	}{
+		{
+			name:     "null value match",
+			expected: nil,
+			actual:   spanner.NullDate{Valid: false},
+			want:     true,
+		},
+		{
+			name:     "valid date string match",
+			expected: "2024-01-15",
+			actual:   spanner.NullDate{Date: testDate, Valid: true},
+			want:     true,
+		},
+		{
+			name:     "valid civil.Date match",
+			expected: testDate,
+			actual:   spanner.NullDate{Date: testDate, Valid: true},
+			want:     true,
+		},
+		{
+			name:     "invalid date string",
+			expected: "invalid-date",
+			actual:   spanner.NullDate{Date: testDate, Valid: true},
+			want:     false,
+		},
+		{
+			name:     "spanner.NullDate to spanner.NullDate",
+			expected: spanner.NullDate{Date: testDate, Valid: true},
+			actual:   spanner.NullDate{Date: testDate, Valid: true},
+			want:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := v.compareNullDate(tt.expected, tt.actual)
+			if got != tt.want {
+				t.Errorf("compareNullDate(%v, %v) = %v, want %v", tt.expected, tt.actual, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCompareDate(t *testing.T) {
+	v := &Validator{}
+	testDate := civil.Date{Year: 2024, Month: 1, Day: 15}
+
+	tests := []struct {
+		name     string
+		expected interface{}
+		actual   interface{}
+		want     bool
+	}{
+		{
+			name:     "date string match",
+			expected: "2024-01-15",
+			actual:   testDate,
+			want:     true,
+		},
+		{
+			name:     "civil.Date match",
+			expected: testDate,
+			actual:   testDate,
+			want:     true,
+		},
+		{
+			name:     "date string mismatch",
+			expected: "2024-01-16",
+			actual:   testDate,
+			want:     false,
+		},
+		{
+			name:     "invalid date string",
+			expected: "invalid-date",
+			actual:   testDate,
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := v.compareDate(tt.expected, tt.actual)
+			if got != tt.want {
+				t.Errorf("compareDate(%v, %v) = %v, want %v", tt.expected, tt.actual, got, tt.want)
+			}
+		})
 	}
 }

@@ -30,3 +30,31 @@ CREATE TABLE json (
     Data STRING(MAX),
     Metadata STRING(MAX)
 ) PRIMARY KEY (ID);
+
+CREATE TABLE NullTypes (
+    ID STRING(36) NOT NULL,
+    NullString STRING(100),
+    NullInt64 INT64,
+    NullBool BOOL,
+    NullFloat64 FLOAT64,
+    NullDate DATE,
+    NullTimestamp TIMESTAMP,
+    NullNumeric NUMERIC,
+    NullJson JSON
+) PRIMARY KEY (ID);
+
+CREATE TABLE ArrayTypes (
+    ID STRING(36) NOT NULL,
+    StringArray ARRAY<STRING(50)>,
+    Int64Array ARRAY<INT64>,
+    BoolArray ARRAY<BOOL>,
+    NullStringArray ARRAY<STRING(50)>
+) PRIMARY KEY (ID);
+
+CREATE TABLE ComplexTypes (
+    ID STRING(36) NOT NULL,
+    BytesData BYTES(MAX),
+    NumericData NUMERIC,
+    DateData DATE,
+    JsonData JSON
+) PRIMARY KEY (ID);
