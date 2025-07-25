@@ -31,7 +31,6 @@ CREATE TABLE json (
     Metadata STRING(MAX)
 ) PRIMARY KEY (ID);
 
--- Null型対応テーブル
 CREATE TABLE NullTypes (
     ID STRING(36) NOT NULL,
     NullString STRING(100),
@@ -44,7 +43,6 @@ CREATE TABLE NullTypes (
     NullJson JSON
 ) PRIMARY KEY (ID);
 
--- 配列型テーブル
 CREATE TABLE ArrayTypes (
     ID STRING(36) NOT NULL,
     StringArray ARRAY<STRING(50)>,
@@ -53,7 +51,6 @@ CREATE TABLE ArrayTypes (
     NullStringArray ARRAY<STRING(50)>
 ) PRIMARY KEY (ID);
 
--- BYTES・その他の型テーブル
 CREATE TABLE ComplexTypes (
     ID STRING(36) NOT NULL,
     BytesData BYTES(MAX),
