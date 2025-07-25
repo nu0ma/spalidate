@@ -10,6 +10,7 @@ import (
 	"cloud.google.com/go/spanner"
 	"cloud.google.com/go/spanner/apiv1/spannerpb"
 	"google.golang.org/api/iterator"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 type spannerClient struct {
@@ -102,31 +103,56 @@ func (c *spannerClient) queryRowsWithOrder(tableName string, columns []string, o
 				return nil, fmt.Errorf("failed to read column %d: %w", i, err)
 			}
 
+			// Check if column allows NULL values by attempting to decode as nullable type first
 			switch col.Type.Code {
 			case spannerpb.TypeCode_INT64:
-				var v int64
+				var v spanner.NullInt64
 				if err := col.Decode(&v); err != nil {
-					return nil, fmt.Errorf("failed to decode int64: %w", err)
+					// Try non-nullable version
+					var nonNull int64
+					if err := col.Decode(&nonNull); err != nil {
+						return nil, fmt.Errorf("failed to decode int64: %w", err)
+					}
+					rowData[columnNames[i]] = nonNull
+				} else {
+					rowData[columnNames[i]] = v
 				}
-				rowData[columnNames[i]] = v
 			case spannerpb.TypeCode_STRING:
-				var v string
+				var v spanner.NullString
 				if err := col.Decode(&v); err != nil {
-					return nil, fmt.Errorf("failed to decode string: %w", err)
+					// Try non-nullable version
+					var nonNull string
+					if err := col.Decode(&nonNull); err != nil {
+						return nil, fmt.Errorf("failed to decode string: %w", err)
+					}
+					rowData[columnNames[i]] = nonNull
+				} else {
+					rowData[columnNames[i]] = v
 				}
-				rowData[columnNames[i]] = v
 			case spannerpb.TypeCode_FLOAT64:
-				var v float64
+				var v spanner.NullFloat64
 				if err := col.Decode(&v); err != nil {
-					return nil, fmt.Errorf("failed to decode float64: %w", err)
+					// Try non-nullable version
+					var nonNull float64
+					if err := col.Decode(&nonNull); err != nil {
+						return nil, fmt.Errorf("failed to decode float64: %w", err)
+					}
+					rowData[columnNames[i]] = nonNull
+				} else {
+					rowData[columnNames[i]] = v
 				}
-				rowData[columnNames[i]] = v
 			case spannerpb.TypeCode_BOOL:
-				var v bool
+				var v spanner.NullBool
 				if err := col.Decode(&v); err != nil {
-					return nil, fmt.Errorf("failed to decode bool: %w", err)
+					// Try non-nullable version
+					var nonNull bool
+					if err := col.Decode(&nonNull); err != nil {
+						return nil, fmt.Errorf("failed to decode bool: %w", err)
+					}
+					rowData[columnNames[i]] = nonNull
+				} else {
+					rowData[columnNames[i]] = v
 				}
-				rowData[columnNames[i]] = v
 			case spannerpb.TypeCode_BYTES:
 				var v []byte
 				if err := col.Decode(&v); err != nil {
@@ -134,17 +160,96 @@ func (c *spannerClient) queryRowsWithOrder(tableName string, columns []string, o
 				}
 				rowData[columnNames[i]] = v
 			case spannerpb.TypeCode_TIMESTAMP:
-				var v time.Time
+				var v spanner.NullTime
 				if err := col.Decode(&v); err != nil {
-					return nil, fmt.Errorf("failed to decode timestamp: %w", err)
+					// Try non-nullable version
+					var nonNull time.Time
+					if err := col.Decode(&nonNull); err != nil {
+						return nil, fmt.Errorf("failed to decode timestamp: %w", err)
+					}
+					rowData[columnNames[i]] = nonNull
+				} else {
+					rowData[columnNames[i]] = v
 				}
-				rowData[columnNames[i]] = v
 			case spannerpb.TypeCode_DATE:
-				var v civil.Date
+				var v spanner.NullDate
 				if err := col.Decode(&v); err != nil {
-					return nil, fmt.Errorf("failed to decode date: %w", err)
+					// Try non-nullable version
+					var nonNull civil.Date
+					if err := col.Decode(&nonNull); err != nil {
+						return nil, fmt.Errorf("failed to decode date: %w", err)
+					}
+					rowData[columnNames[i]] = nonNull
+				} else {
+					rowData[columnNames[i]] = v
 				}
-				rowData[columnNames[i]] = v
+			case spannerpb.TypeCode_NUMERIC:
+				var v spanner.NullNumeric
+				if err := col.Decode(&v); err != nil {
+					// Try non-nullable version using interface{}
+					var nonNull interface{}
+					if err := col.Decode(&nonNull); err != nil {
+						return nil, fmt.Errorf("failed to decode numeric: %w", err)
+					}
+					// Convert structpb.Value to string if needed
+					if sv, ok := nonNull.(*structpb.Value); ok && sv.GetStringValue() != "" {
+						nonNull = sv.GetStringValue()
+					}
+					rowData[columnNames[i]] = nonNull
+				} else {
+					rowData[columnNames[i]] = v
+				}
+			case spannerpb.TypeCode_JSON:
+				var v spanner.NullJSON
+				if err := col.Decode(&v); err != nil {
+					// Try non-nullable version using interface{}
+					var nonNull interface{}
+					if err := col.Decode(&nonNull); err != nil {
+						return nil, fmt.Errorf("failed to decode json: %w", err)
+					}
+					// Convert structpb.Value to string if needed
+					if sv, ok := nonNull.(*structpb.Value); ok && sv.GetStringValue() != "" {
+						nonNull = sv.GetStringValue()
+					}
+					rowData[columnNames[i]] = nonNull
+				} else {
+					rowData[columnNames[i]] = v
+				}
+			case spannerpb.TypeCode_ARRAY:
+				// For arrays, we need to handle different element types
+				if col.Type.ArrayElementType != nil {
+					switch col.Type.ArrayElementType.Code {
+					case spannerpb.TypeCode_STRING:
+						var v []string
+						if err := col.Decode(&v); err != nil {
+							return nil, fmt.Errorf("failed to decode string array: %w", err)
+						}
+						rowData[columnNames[i]] = v
+					case spannerpb.TypeCode_INT64:
+						var v []int64
+						if err := col.Decode(&v); err != nil {
+							return nil, fmt.Errorf("failed to decode int64 array: %w", err)
+						}
+						rowData[columnNames[i]] = v
+					case spannerpb.TypeCode_BOOL:
+						var v []bool
+						if err := col.Decode(&v); err != nil {
+							return nil, fmt.Errorf("failed to decode bool array: %w", err)
+						}
+						rowData[columnNames[i]] = v
+					case spannerpb.TypeCode_FLOAT64:
+						var v []float64
+						if err := col.Decode(&v); err != nil {
+							return nil, fmt.Errorf("failed to decode float64 array: %w", err)
+						}
+						rowData[columnNames[i]] = v
+					default:
+						// For other array types, fall back to generic value
+						rowData[columnNames[i]] = col.Value
+					}
+				} else {
+					rowData[columnNames[i]] = col.Value
+				}
 			default:
 				rowData[columnNames[i]] = col.Value
 			}

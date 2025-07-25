@@ -7,16 +7,43 @@ import (
 	"math"
 	"math/big"
 	"reflect"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/civil"
 	"cloud.google.com/go/spanner"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func (v *Validator) compareValues(expected, actual interface{}) bool {
 	if expected == nil && actual == nil {
 		return true
 	}
+
+	// Handle Spanner null types when expected is nil
+	if expected == nil && actual != nil {
+		actualType := reflect.TypeOf(actual)
+		switch actualType.String() {
+		case "spanner.NullString":
+			return v.compareNullString(expected, actual)
+		case "spanner.NullInt64":
+			return v.compareNullInt64(expected, actual)
+		case "spanner.NullBool":
+			return v.compareNullBool(expected, actual)
+		case "spanner.NullFloat64":
+			return v.compareNullFloat64(expected, actual)
+		case "spanner.NullTime":
+			return v.compareNullTime(expected, actual)
+		case "spanner.NullDate":
+			return v.compareNullDate(expected, actual)
+		case "spanner.NullNumeric":
+			return v.compareNullNumeric(expected, actual)
+		case "spanner.NullJSON":
+			return v.compareNullJSON(expected, actual)
+		}
+		return false
+	}
+
 	if expected == nil || actual == nil {
 		return false
 	}
@@ -24,15 +51,13 @@ func (v *Validator) compareValues(expected, actual interface{}) bool {
 	expectedType := reflect.TypeOf(expected)
 	actualType := reflect.TypeOf(actual)
 
+	// Handle structpb.Value types (from non-nullable NUMERIC/JSON)
+	if strings.Contains(actualType.String(), "structpb.Value") {
+		return v.compareStructPBValue(expected, actual)
+	}
+
+	// Handle Spanner null types first
 	switch actualType.String() {
-	case "*big.Rat", "big.Rat":
-		return v.compareBigRat(expected, actual)
-	case "time.Time":
-		return v.compareTimestamp(expected, actual)
-	case "[]uint8":
-		return v.compareBytes(expected, actual)
-	case "map[string]interface{}", "map[string]interface {}":
-		return v.compareJSON(expected, actual)
 	case "spanner.NullString":
 		return v.compareNullString(expected, actual)
 	case "spanner.NullInt64":
@@ -49,6 +74,14 @@ func (v *Validator) compareValues(expected, actual interface{}) bool {
 		return v.compareNullNumeric(expected, actual)
 	case "spanner.NullJSON":
 		return v.compareNullJSON(expected, actual)
+	case "*big.Rat", "big.Rat":
+		return v.compareBigRat(expected, actual)
+	case "time.Time":
+		return v.compareTimestamp(expected, actual)
+	case "[]uint8":
+		return v.compareBytes(expected, actual)
+	case "map[string]interface{}", "map[string]interface {}":
+		return v.compareJSON(expected, actual)
 	case "civil.Date":
 		return v.compareDate(expected, actual)
 	}
@@ -560,5 +593,22 @@ func (v *Validator) compareDate(expected, actual interface{}) bool {
 		return actualDate == exp
 	default:
 		return false
+	}
+}
+
+func (v *Validator) compareStructPBValue(expected, actual interface{}) bool {
+	actualPB, ok := actual.(*structpb.Value)
+	if !ok {
+		return false
+	}
+	
+	// Extract the string value from structpb.Value
+	actualStr := actualPB.GetStringValue()
+	
+	switch exp := expected.(type) {
+	case string:
+		return exp == actualStr
+	default:
+		return fmt.Sprintf("%v", expected) == actualStr
 	}
 }

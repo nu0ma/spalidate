@@ -5,22 +5,22 @@ tables:
     order_by: "ID"
     rows:
       - ID: "complex-001"
-        BytesData: "dGVzdCBieXRlcyBkYXRh"  # base64 encoded "test bytes data"
+        BytesData: "ZEdWemRDQmllWFJsY3lCa1lYUmg="  # actual base64 stored in DB
         NumericData: "123.456789"
         DateData: "2024-01-01"
-        JsonData: '{"type": "test", "value": 42}'
+        JsonData: '{"type":"test","value":42}'
       - ID: "complex-002"
         BytesData: ""  # empty bytes
         NumericData: "0"
         DateData: "1970-01-01"
         JsonData: '{}'
       - ID: "complex-003"
-        BytesData: "YW5vdGhlciB0ZXN0"  # base64 encoded "another test"
+        BytesData: "WVc1dmRHaGxjaUIwWlhOMA=="  # actual base64 stored in DB
         NumericData: "999999.123456"
         DateData: "2024-12-31"
-        JsonData: '{"array": [1, 2, 3], "nested": {"key": "value"}}'
+        JsonData: '{"array":[1,2,3],"nested":{"key":"value"}}'
       - ID: "complex-004"
-        BytesData: "c3BlY2lhbCBjaGFyYWN0ZXJz"  # base64 encoded "special characters"
+        BytesData: "YzNCbFkybGhiQ0JqYUdGeVlXTjBaWEp6"  # actual base64 stored in DB
         NumericData: "-123.456"
         DateData: "2000-02-29"
-        JsonData: '{"boolean": true, "null_value": null, "number": 3.14}'
+        JsonData: '{"boolean":true,"null_value":null,"number":3.14}'

@@ -6,6 +6,8 @@ import (
 	"math/big"
 	"strings"
 	"time"
+
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func (v *Validator) buildPrimaryKey(row map[string]interface{}, primaryKeyColumns []string) string {
@@ -58,6 +60,8 @@ func (v *Validator) formatValueForError(value interface{}) string {
 			return fmt.Sprintf("%.100s...", v)
 		}
 		return fmt.Sprintf("%q", v)
+	case *structpb.Value:
+		return fmt.Sprintf("%q", v.GetStringValue())
 	case []interface{}:
 		if len(v) > 10 {
 			return fmt.Sprintf("[%d items]", len(v))

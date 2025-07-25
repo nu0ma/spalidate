@@ -39,4 +39,4 @@ tables:
         NullDate: "1970-01-01"
         NullTimestamp: "1970-01-01T00:00:00Z"
         NullNumeric: "0"
-        NullJson: "null"
+        NullJson: null
