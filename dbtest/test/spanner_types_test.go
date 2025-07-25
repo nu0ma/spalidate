@@ -1,80 +1,106 @@
-package test
+//go:build integration
+// +build integration
+
+package integration
 
 import (
 	"testing"
 )
 
 func TestNullTypesValidation(t *testing.T) {
-	testCases := []ValidationTestCase{
-		{
-			name:         "null types validation",
-			configPath:   "expected/null_types.yaml",
-			expectErrors: false,
-		},
-	}
+	// Build spalidate binary for testing
+	binaryPath := BuildSpalidate(t)
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			runValidationTest(t, tc)
-		})
-	}
+	// Test null types validation
+	config := DefaultTestConfig().
+		WithValidationFile(GetTestDataPath("null_types.yaml")).
+		WithVerbose()
+	config.BinaryPath = binaryPath
+
+	output, err := RunSpalidate(t, config)
+	AssertCommandSuccess(t, output, err)
+
+	// Verify successful validation output
+	AssertContains(t, string(output), "Validation completed successfully")
+	AssertContains(t, string(output), "NullTypes")
 }
 
 func TestArrayTypesValidation(t *testing.T) {
-	testCases := []ValidationTestCase{
-		{
-			name:         "array types validation",
-			configPath:   "expected/array_types.yaml",
-			expectErrors: false,
-		},
-	}
+	// Build spalidate binary for testing
+	binaryPath := BuildSpalidate(t)
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			runValidationTest(t, tc)
-		})
-	}
+	// Test array types validation
+	config := DefaultTestConfig().
+		WithValidationFile(GetTestDataPath("array_types.yaml")).
+		WithVerbose()
+	config.BinaryPath = binaryPath
+
+	output, err := RunSpalidate(t, config)
+	AssertCommandSuccess(t, output, err)
+
+	// Verify successful validation output
+	AssertContains(t, string(output), "Validation completed successfully")
+	AssertContains(t, string(output), "ArrayTypes")
 }
 
 func TestComplexTypesValidation(t *testing.T) {
-	testCases := []ValidationTestCase{
-		{
-			name:         "complex types validation",
-			configPath:   "expected/complex_types.yaml",
-			expectErrors: false,
-		},
-	}
+	// Build spalidate binary for testing
+	binaryPath := BuildSpalidate(t)
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			runValidationTest(t, tc)
-		})
-	}
+	// Test complex types validation
+	config := DefaultTestConfig().
+		WithValidationFile(GetTestDataPath("complex_types.yaml")).
+		WithVerbose()
+	config.BinaryPath = binaryPath
+
+	output, err := RunSpalidate(t, config)
+	AssertCommandSuccess(t, output, err)
+
+	// Verify successful validation output
+	AssertContains(t, string(output), "Validation completed successfully")
+	AssertContains(t, string(output), "ComplexTypes")
 }
 
 func TestAllSpannerTypesValidation(t *testing.T) {
-	// Test that validates all new Spanner types together
-	testCases := []ValidationTestCase{
+	// Build spalidate binary for testing
+	binaryPath := BuildSpalidate(t)
+
+	// Test all new Spanner types together
+	testCases := []struct {
+		name           string
+		validationFile string
+		expectedTable  string
+	}{
 		{
-			name:         "null types validation",
-			configPath:   "expected/null_types.yaml",
-			expectErrors: false,
+			name:           "null types validation",
+			validationFile: "null_types.yaml",
+			expectedTable:  "NullTypes",
 		},
 		{
-			name:         "array types validation", 
-			configPath:   "expected/array_types.yaml",
-			expectErrors: false,
+			name:           "array types validation",
+			validationFile: "array_types.yaml",
+			expectedTable:  "ArrayTypes",
 		},
 		{
-			name:         "complex types validation",
-			configPath:   "expected/complex_types.yaml",
-			expectErrors: false,
+			name:           "complex types validation",
+			validationFile: "complex_types.yaml",
+			expectedTable:  "ComplexTypes",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			runValidationTest(t, tc)
+			config := DefaultTestConfig().
+				WithValidationFile(GetTestDataPath(tc.validationFile)).
+				WithVerbose()
+			config.BinaryPath = binaryPath
+
+			output, err := RunSpalidate(t, config)
+			AssertCommandSuccess(t, output, err)
+
+			// Verify successful validation output
+			AssertContains(t, string(output), "Validation completed successfully")
+			AssertContains(t, string(output), tc.expectedTable)
 		})
 	}
 }
