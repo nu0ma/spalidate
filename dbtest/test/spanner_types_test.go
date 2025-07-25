@@ -21,7 +21,7 @@ func TestNullTypesValidation(t *testing.T) {
 	AssertCommandSuccess(t, output, err)
 
 	// Verify successful validation output
-	AssertContains(t, string(output), "Validation completed successfully")
+	AssertContains(t, string(output), "All validations passed!")
 	AssertContains(t, string(output), "NullTypes")
 }
 
@@ -39,7 +39,7 @@ func TestArrayTypesValidation(t *testing.T) {
 	AssertCommandSuccess(t, output, err)
 
 	// Verify successful validation output
-	AssertContains(t, string(output), "Validation completed successfully")
+	AssertContains(t, string(output), "All validations passed!")
 	AssertContains(t, string(output), "ArrayTypes")
 }
 
@@ -57,7 +57,7 @@ func TestComplexTypesValidation(t *testing.T) {
 	AssertCommandSuccess(t, output, err)
 
 	// Verify successful validation output
-	AssertContains(t, string(output), "Validation completed successfully")
+	AssertContains(t, string(output), "All validations passed!")
 	AssertContains(t, string(output), "ComplexTypes")
 }
 
@@ -99,7 +99,7 @@ func TestAllSpannerTypesValidation(t *testing.T) {
 			AssertCommandSuccess(t, output, err)
 
 			// Verify successful validation output
-			AssertContains(t, string(output), "Validation completed successfully")
+			AssertContains(t, string(output), "All validations passed!")
 			AssertContains(t, string(output), tc.expectedTable)
 		})
 	}

@@ -38,7 +38,7 @@ INSERT INTO NullTypes (ID, NullString, NullInt64, NullBool, NullFloat64, NullDat
 ('null-001', 'test string', 42, true, 3.14159, '2024-01-15', '2024-01-15T10:30:00Z', 123.456, JSON '{"key": "value"}'),
 ('null-002', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
 ('null-003', 'another string', 100, false, 2.71828, '2024-12-31', '2024-12-31T23:59:59Z', 999.999, JSON '{"active": true, "count": 0}'),
-('null-004', '', 0, true, 0.0, '1970-01-01', '1970-01-01T00:00:00Z', 0, JSON 'null');
+('null-004', '', 0, true, 0.0, '1970-01-01', '1970-01-01T00:00:00Z', 0, NULL);
 
 -- ArrayTypes test data
 INSERT INTO ArrayTypes (ID, StringArray, Int64Array, BoolArray, NullStringArray) VALUES
