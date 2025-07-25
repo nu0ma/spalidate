@@ -3,6 +3,9 @@ DELETE FROM Orders WHERE true;
 DELETE FROM Products WHERE true;
 DELETE FROM Users WHERE true;
 DELETE FROM json WHERE true;
+DELETE FROM NullTypes WHERE true;
+DELETE FROM ArrayTypes WHERE true;
+DELETE FROM ComplexTypes WHERE true;
 
 -- Users test data
 INSERT INTO Users (UserID, Name, Email, Status, CreatedAt) VALUES
@@ -29,3 +32,24 @@ INSERT INTO json (ID, Data, Metadata) VALUES
 ('json-003', 'null', '{}'),
 ('json-004', '{"products": [{"id": 1, "name": "Laptop"}, {"id": 2, "name": "Mouse"}]}', '{"created_at": "2024-01-01T00:00:00Z", "version": 1.0}'),
 ('json-005', '{"empty_object": {}, "empty_array": [], "boolean_values": [true, false, null]}', '{"test": true}');
+
+-- NullTypes test data
+INSERT INTO NullTypes (ID, NullString, NullInt64, NullBool, NullFloat64, NullDate, NullTimestamp, NullNumeric, NullJson) VALUES
+('null-001', 'test string', 42, true, 3.14159, '2024-01-15', '2024-01-15T10:30:00Z', 123.456, JSON '{"key": "value"}'),
+('null-002', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+('null-003', 'another string', 100, false, 2.71828, '2024-12-31', '2024-12-31T23:59:59Z', 999.999, JSON '{"active": true, "count": 0}'),
+('null-004', '', 0, true, 0.0, '1970-01-01', '1970-01-01T00:00:00Z', 0, JSON 'null');
+
+-- ArrayTypes test data
+INSERT INTO ArrayTypes (ID, StringArray, Int64Array, BoolArray, NullStringArray) VALUES
+('array-001', ['hello', 'world', 'test'], [1, 2, 3, 4, 5], [true, false, true], ['first', 'second', 'third']),
+('array-002', [], [], [], []),
+('array-003', ['single'], [42], [false], ['only one']),
+('array-004', ['a', 'b', 'c', 'd'], [10, 20, 30], [true, true, false, true], ['mixed', 'content', 'here']);
+
+-- ComplexTypes test data
+INSERT INTO ComplexTypes (ID, BytesData, NumericData, DateData, JsonData) VALUES
+('complex-001', B'dGVzdCBieXRlcyBkYXRh', 123.456789, '2024-01-01', JSON '{"type": "test", "value": 42}'),
+('complex-002', B'', 0, '1970-01-01', JSON '{}'),
+('complex-003', B'YW5vdGhlciB0ZXN0', 999999.123456, '2024-12-31', JSON '{"array": [1, 2, 3], "nested": {"key": "value"}}'),
+('complex-004', B'c3BlY2lhbCBjaGFyYWN0ZXJz', -123.456, '2000-02-29', JSON '{"boolean": true, "null_value": null, "number": 3.14}');
