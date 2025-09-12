@@ -30,30 +30,31 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("failed to parse YAML: %w", err)
 	}
 
-	if err := validateConfig(&config); err != nil {
-		return nil, fmt.Errorf("invalid config: %w", err)
+	// Validate config inline
+	if len(config.Tables) == 0 {
+		return nil, fmt.Errorf("no tables defined in config")
+	}
+
+	for tableName, tableConfig := range config.Tables {
+		if err := validateTable(tableName, tableConfig); err != nil {
+			return nil, fmt.Errorf("invalid config: %w", err)
+		}
 	}
 
 	return &config, nil
 }
 
-func validateConfig(config *Config) error {
-	if len(config.Tables) == 0 {
-		return fmt.Errorf("no tables defined in config")
+func validateTable(name string, config TableConfig) error {
+	if name == "" {
+		return fmt.Errorf("table name cannot be empty")
 	}
 
-	for tableName, tableConfig := range config.Tables {
-		if tableName == "" {
-			return fmt.Errorf("table name cannot be empty")
-		}
+	if config.Count < 0 {
+		return fmt.Errorf("table %s: count cannot be negative", name)
+	}
 
-		if tableConfig.Count < 0 {
-			return fmt.Errorf("table %s: count cannot be negative", tableName)
-		}
-
-		if len(tableConfig.Columns) == 0 && len(tableConfig.Rows) == 0 && tableConfig.Count > 0 {
-			return fmt.Errorf("table %s: expected %d rows but no columns or rows defined", tableName, tableConfig.Count)
-		}
+	if config.Count > 0 && len(config.Columns) == 0 && len(config.Rows) == 0 {
+		return fmt.Errorf("table %s: expected %d rows but no columns or rows defined", name, config.Count)
 	}
 
 	return nil
@@ -68,17 +69,21 @@ func (c *Config) GetTableNames() []string {
 }
 
 func (t *TableConfig) GetColumnNames() []string {
-	var names []string
 	if len(t.Columns) > 0 {
-		names = make([]string, 0, len(t.Columns))
+		names := make([]string, 0, len(t.Columns))
 		for name := range t.Columns {
 			names = append(names, name)
 		}
-	} else if len(t.Rows) > 0 {
-		names = make([]string, 0, len(t.Rows[0]))
+		return names
+	}
+	
+	if len(t.Rows) > 0 {
+		names := make([]string, 0, len(t.Rows[0]))
 		for name := range t.Rows[0] {
 			names = append(names, name)
 		}
+		return names
 	}
-	return names
+	
+	return nil
 }

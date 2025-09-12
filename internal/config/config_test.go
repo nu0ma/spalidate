@@ -66,63 +66,63 @@ tables:
 func TestValidateConfig(t *testing.T) {
 	tests := []struct {
 		name    string
-		config  *Config
+		yaml    string
 		wantErr bool
 	}{
 		{
 			name: "valid config",
-			config: &Config{
-				Tables: map[string]TableConfig{
-					"Users": {
-						Count: 1,
-						Columns: map[string]interface{}{
-							"ID": "test",
-						},
-					},
-				},
-			},
+			yaml: `
+tables:
+  Users:
+    count: 1
+    columns:
+      ID: "test"
+`,
 			wantErr: false,
 		},
 		{
 			name: "empty tables",
-			config: &Config{
-				Tables: map[string]TableConfig{},
-			},
+			yaml: `tables: {}`,
 			wantErr: true,
 		},
 		{
 			name: "negative count",
-			config: &Config{
-				Tables: map[string]TableConfig{
-					"Users": {
-						Count: -1,
-						Columns: map[string]interface{}{
-							"ID": "test",
-						},
-					},
-				},
-			},
+			yaml: `
+tables:
+  Users:
+    count: -1
+    columns:
+      ID: "test"
+`,
 			wantErr: true,
 		},
 		{
 			name: "count > 0 but no columns",
-			config: &Config{
-				Tables: map[string]TableConfig{
-					"Users": {
-						Count:   1,
-						Columns: map[string]interface{}{},
-					},
-				},
-			},
+			yaml: `
+tables:
+  Users:
+    count: 1
+`,
 			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateConfig(tt.config)
+			tmpFile, err := os.CreateTemp("", "test-validate-*.yaml")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer os.Remove(tmpFile.Name())
+
+			if _, err := tmpFile.WriteString(tt.yaml); err != nil {
+				t.Fatal(err)
+			}
+			tmpFile.Close()
+
+			_, err = LoadConfig(tmpFile.Name())
 			if (err != nil) != tt.wantErr {
-				t.Errorf("validateConfig() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("LoadConfig() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
