@@ -3,7 +3,7 @@ tables:
   ArrayTypes:
     count: 4
     order_by: "ID"
-    rows:
+    columns:
       - ID: "array-001"
         StringArray: ["hello", "world", "test"]
         Int64Array: [1, 2, 3, 4, 5]

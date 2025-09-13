@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/nu0ma/spalidate/internal/config"
-	"github.com/nu0ma/spalidate/internal/validator"
 	"github.com/spf13/cobra"
 )
 
@@ -66,38 +65,5 @@ func run(cmd *cobra.Command, args []string) error {
 		log.Printf("Loaded config with %d tables", len(cfg.Tables))
 	}
 
-	v, err := validator.NewValidator(project, instance, database, port)
-	if err != nil {
-		return fmt.Errorf("creating validator: %w", err)
-	}
-	defer v.Close()
-
-	if verbose {
-		log.Println("Connected to Spanner")
-	}
-
-	results, err := v.Validate(cfg)
-	if err != nil {
-		return fmt.Errorf("during validation: %w", err)
-	}
-
-	printResults(results)
 	return nil
-}
-
-func printResults(results *validator.ValidationResult) {
-	if results.HasErrors() {
-		fmt.Println("Validation failed:")
-		for _, err := range results.Errors {
-			fmt.Printf("  ❌ %s\n", err)
-		}
-		os.Exit(1)
-	}
-
-	fmt.Println("✅ All validations passed!")
-	if verbose {
-		for _, msg := range results.Messages {
-			fmt.Printf("  ✓ %s\n", msg)
-		}
-	}
 }
