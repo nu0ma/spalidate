@@ -17,10 +17,27 @@ go install github.com/nu0ma/spalidate@latest
 ```yaml
 tables:
   Users:
-    count: 1
     columns:
       - UserID: "user-001"
-        Name: "Test User"
+        Name: "Alice Johnson"
+        Email: "alice@example.com"
+        Status: 1
+        CreatedAt: "2024-01-01T00:00:00Z"
+  Products:
+    columns:
+      - ProductID: "prod-001"
+        Name: "Laptop Computer"
+        Price: 150000
+        IsActive: true
+        CategoryID: "cat-electronics"
+        CreatedAt: "2024-01-01T00:00:00Z"
+  Books:
+    columns:
+      - BookID: "book-001"
+        Title: "The Great Gatsby"
+        Author: "F. Scott Fitzgerald"
+        PublishedYear: 1925
+        JSONData: '{"genre": "Fiction", "rating": 4.5}'
 ```
 
 3) Run
@@ -39,27 +56,8 @@ On success: `Validation passed for all tables`
 - `-i, --instance` (required): Instance ID
 - `-d, --database` (required): Database ID
 - `--port` (default 9010): Emulator port
-- `-v, --verbose`: Verbose logs (same as `--log-level=debug`)
-- `--log-level` (`debug|info|warn|error`, default `info`)
-- `--log-format` (`console|json`, default `console`)
-- `--color` (`auto|always|never`, default `auto`)
 - `--version`: Show version
 
-Tip: in non-TTY contexts (CI or `go test`) force color with
-`SPALIDATE_COLOR=always` or `--color=always`.
-
-## Logging
-
-- Uses Charmbracelet/log with unified output; standard `log` is captured.
-- `--log-format=json` for structured logs; `console` for colored logs (`--color` controls coloring).
-
-## What It Validates
-
-- Table existence
-- Row count (`count`)
-- Specified column values (`columns`)
-
-See `test_validation.yaml` for a fuller example.
 
 ## License
 
