@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -22,17 +21,37 @@ var (
 	spannerClient *spanner.Client
 )
 
+var schema = `
+CREATE TABLE Users (
+	UserID STRING(36) NOT NULL,
+	Name STRING(100) NOT NULL,
+	Email STRING(255) NOT NULL,
+	Status INT64 NOT NULL,
+	CreatedAt TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true)
+) PRIMARY KEY (UserID);
+
+CREATE TABLE Products (
+	ProductID STRING(36) NOT NULL,
+	Name STRING(200) NOT NULL,
+	Price INT64 NOT NULL,
+	IsActive BOOL NOT NULL,
+	CategoryID STRING(36),
+	CreatedAt TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true)
+) PRIMARY KEY (ProductID);
+
+CREATE TABLE Books (
+	BookID STRING(36) NOT NULL,
+	Title STRING(200) NOT NULL,
+	Author STRING(100) NOT NULL,
+	PublishedYear INT64 NOT NULL,
+	JSONData STRING(MAX)
+) PRIMARY KEY (BookID);
+`
+
 func TestMain(m *testing.M) {
 	ctx := context.Background()
 
-	// Read schema
-	schemaPath := filepath.Join("dbtest", "fixtures", "schema.sql")
-	schemaContent, err := os.ReadFile(schemaPath)
-	if err != nil {
-		panic(fmt.Sprintf("Failed to read schema file: %v", err))
-	}
-
-	ddls := parseSchemaStatements(string(schemaContent))
+	ddls := parseSchemaStatements(string(schema))
 
 	emulator, clients, teardown, err := spanemuboost.NewEmulatorWithClients(ctx,
 		spanemuboost.WithProjectID(testProject),

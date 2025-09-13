@@ -67,24 +67,13 @@ func (v *Validator) validateTable(ctx context.Context, tableName string, tableCo
 		return nil
 	})
 
-	if err != nil {
-		if err == iterator.Done {
-			if tableConfig.Count > 0 {
-				return fmt.Errorf("expected %d rows, but got 0", tableConfig.Count)
-			}
-			return nil
-		}
+	if err != nil && err != iterator.Done {
 		return fmt.Errorf("query execution failed: %w", err)
-	}
-
-	// Validate row count
-	if len(rows) != tableConfig.Count {
-		return fmt.Errorf("row count mismatch: expected %d, got %d", tableConfig.Count, len(rows))
 	}
 
 	// When 'columns' is set, verify that for each expected spec
 	// at least one row strictly matches with all columns.
-	if len(tableConfig.Columns) > 0 && len(rows) > 0 {
+	if len(tableConfig.Columns) > 0 {
 		for _, expectedData := range tableConfig.Columns {
 			matched := false
 			for _, actualData := range rows {
