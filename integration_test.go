@@ -74,7 +74,9 @@ func TestMain(m *testing.M) {
 		panic(fmt.Sprintf("Failed to get emulator port: %v", err))
 	}
 	emulatorHost = fmt.Sprintf("%s:%s", host, port.Port())
-	os.Setenv("SPANNER_EMULATOR_HOST", emulatorHost)
+	if err := os.Setenv("SPANNER_EMULATOR_HOST", emulatorHost); err != nil {
+		panic(fmt.Sprintf("Failed to set SPANNER_EMULATOR_HOST: %v", err))
+	}
 
 	// Use the Spanner client from emulator
 	spannerClient = clients.Client
@@ -276,7 +278,7 @@ func TestCLIValidation(t *testing.T) {
 		if err == nil {
 			t.Fatalf("Validation should fail but succeeded. Output: %s", output)
 		}
-		if !(strings.Contains(output, "no row strictly matched spec") || strings.Contains(output, "no row matched expected spec")) {
+		if !strings.Contains(output, "no row strictly matched spec") && !strings.Contains(output, "no row matched expected spec") {
 			t.Errorf("Expected failure reason about unmatched spec. Output: %s", output)
 		}
 	})

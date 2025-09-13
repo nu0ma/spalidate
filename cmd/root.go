@@ -51,9 +51,15 @@ func init() {
 	rootCmd.PersistentFlags().IntVar(&port, "port", 9010, "Spanner emulator port")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging (sets level=debug)")
 
-	rootCmd.MarkPersistentFlagRequired("project")
-	rootCmd.MarkPersistentFlagRequired("instance")
-	rootCmd.MarkPersistentFlagRequired("database")
+	if err := rootCmd.MarkPersistentFlagRequired("project"); err != nil {
+		panic(fmt.Sprintf("failed to mark project flag as required: %v", err))
+	}
+	if err := rootCmd.MarkPersistentFlagRequired("instance"); err != nil {
+		panic(fmt.Sprintf("failed to mark instance flag as required: %v", err))
+	}
+	if err := rootCmd.MarkPersistentFlagRequired("database"); err != nil {
+		panic(fmt.Sprintf("failed to mark database flag as required: %v", err))
+	}
 }
 
 func Execute() {
