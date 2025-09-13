@@ -12,6 +12,24 @@ import (
 	"github.com/nu0ma/spalidate/internal/config"
 )
 
+// newTestValidator creates a properly initialized validator for tests
+func newTestValidator() *Validator {
+	return &Validator{
+		typeRegistry:   NewTypeRegistry(),
+		errorFormatter: NewErrorFormatter(),
+		options:        DefaultComparisonOptions(),
+	}
+}
+
+// newTestValidatorWithOptions creates a validator with custom options for tests
+func newTestValidatorWithOptions(options ComparisonOptions) *Validator {
+	return &Validator{
+		typeRegistry:   NewTypeRegistry(),
+		errorFormatter: NewErrorFormatter(),
+		options:        options,
+	}
+}
+
 func TestValidationResult(t *testing.T) {
 	result := &ValidationResult{}
 
@@ -35,7 +53,7 @@ func TestValidationResult(t *testing.T) {
 }
 
 func TestCompareValues(t *testing.T) {
-	v := &Validator{}
+	v := newTestValidator()
 
 	tests := []struct {
 		name     string
@@ -201,7 +219,7 @@ func TestValidateMultipleRowsByPrimaryKey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := &Validator{}
+			v := newTestValidator()
 			result := &ValidationResult{}
 
 			err := v.validateMultipleRows("TestTable", tt.tableConfig, tt.rows, result)
@@ -223,7 +241,7 @@ func TestValidateMultipleRowsByPrimaryKey(t *testing.T) {
 }
 
 func TestBuildPrimaryKey(t *testing.T) {
-	v := &Validator{}
+	v := newTestValidator()
 
 	tests := []struct {
 		name        string
@@ -308,10 +326,10 @@ func TestCompareBigRat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := NewWithOptions(nil, tt.options)
-			result := v.compareBigRat(tt.expected, tt.actual)
+			v := newTestValidatorWithOptions(tt.options)
+			result := v.compareValues(tt.expected, tt.actual)
 			if result != tt.want {
-				t.Errorf("compareBigRat() = %v, want %v", result, tt.want)
+				t.Errorf("compareValues() = %v, want %v", result, tt.want)
 			}
 		})
 	}
@@ -359,10 +377,10 @@ func TestCompareTimestamp(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := NewWithOptions(nil, tt.options)
-			result := v.compareTimestamp(tt.expected, tt.actual)
+			v := newTestValidatorWithOptions(tt.options)
+			result := v.compareValues(tt.expected, tt.actual)
 			if result != tt.want {
-				t.Errorf("compareTimestamp() = %v, want %v", result, tt.want)
+				t.Errorf("compareValues() = %v, want %v", result, tt.want)
 			}
 		})
 	}
@@ -406,10 +424,10 @@ func TestCompareBytes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := &Validator{}
-			result := v.compareBytes(tt.expected, tt.actual)
+			v := newTestValidator()
+			result := v.compareValues(tt.expected, tt.actual)
 			if result != tt.want {
-				t.Errorf("compareBytes() = %v, want %v", result, tt.want)
+				t.Errorf("compareValues() = %v, want %v", result, tt.want)
 			}
 		})
 	}
@@ -461,10 +479,10 @@ func TestCompareJSON(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := NewWithOptions(nil, tt.options)
-			result := v.compareJSON(tt.expected, tt.actual)
+			v := newTestValidatorWithOptions(tt.options)
+			result := v.compareValues(tt.expected, tt.actual)
 			if result != tt.want {
-				t.Errorf("compareJSON() = %v, want %v", result, tt.want)
+				t.Errorf("compareValues() = %v, want %v", result, tt.want)
 			}
 		})
 	}
@@ -510,7 +528,7 @@ func TestCompareNumericConversions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := NewWithOptions(nil, tt.options)
+			v := newTestValidatorWithOptions(tt.options)
 			result := v.compareNumericConversions(tt.expected, tt.actual)
 			if result != tt.want {
 				t.Errorf("compareNumericConversions() = %v, want %v", result, tt.want)
@@ -560,7 +578,7 @@ func TestCompareSlices(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := &Validator{}
+			v := newTestValidator()
 			result := v.compareSlices(tt.expected, tt.actual)
 			if result != tt.want {
 				t.Errorf("compareSlices() = %v, want %v", result, tt.want)
@@ -570,7 +588,7 @@ func TestCompareSlices(t *testing.T) {
 }
 
 func TestFormatValueForError(t *testing.T) {
-	v := &Validator{}
+	v := newTestValidator()
 	testTime := time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC)
 	testBytes := []byte("test")
 
@@ -709,10 +727,10 @@ func TestCompareTimestampWithMultipleFormats(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := NewWithOptions(nil, tt.options)
-			result := v.compareTimestamp(tt.expected, tt.actual)
+			v := newTestValidatorWithOptions(tt.options)
+			result := v.compareValues(tt.expected, tt.actual)
 			if result != tt.want {
-				t.Errorf("compareTimestamp() = %v, want %v", result, tt.want)
+				t.Errorf("compareValues() = %v, want %v", result, tt.want)
 			}
 		})
 	}
@@ -744,7 +762,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestCompareNullString(t *testing.T) {
-	v := &Validator{}
+	v := newTestValidator()
 
 	tests := []struct {
 		name     string
@@ -786,16 +804,16 @@ func TestCompareNullString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := v.compareNullString(tt.expected, tt.actual)
+			got := v.compareValues(tt.expected, tt.actual)
 			if got != tt.want {
-				t.Errorf("compareNullString(%v, %v) = %v, want %v", tt.expected, tt.actual, got, tt.want)
+				t.Errorf("compareValues(%v, %v) = %v, want %v", tt.expected, tt.actual, got, tt.want)
 			}
 		})
 	}
 }
 
 func TestCompareNullInt64(t *testing.T) {
-	v := &Validator{}
+	v := newTestValidator()
 
 	tests := []struct {
 		name     string
@@ -837,16 +855,16 @@ func TestCompareNullInt64(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := v.compareNullInt64(tt.expected, tt.actual)
+			got := v.compareValues(tt.expected, tt.actual)
 			if got != tt.want {
-				t.Errorf("compareNullInt64(%v, %v) = %v, want %v", tt.expected, tt.actual, got, tt.want)
+				t.Errorf("compareValues(%v, %v) = %v, want %v", tt.expected, tt.actual, got, tt.want)
 			}
 		})
 	}
 }
 
 func TestCompareNullBool(t *testing.T) {
-	v := &Validator{}
+	v := newTestValidator()
 
 	tests := []struct {
 		name     string
@@ -888,9 +906,9 @@ func TestCompareNullBool(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := v.compareNullBool(tt.expected, tt.actual)
+			got := v.compareValues(tt.expected, tt.actual)
 			if got != tt.want {
-				t.Errorf("compareNullBool(%v, %v) = %v, want %v", tt.expected, tt.actual, got, tt.want)
+				t.Errorf("compareValues(%v, %v) = %v, want %v", tt.expected, tt.actual, got, tt.want)
 			}
 		})
 	}
@@ -943,17 +961,17 @@ func TestCompareNullFloat64(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := NewWithOptions(nil, tt.options)
-			got := v.compareNullFloat64(tt.expected, tt.actual)
+			v := newTestValidatorWithOptions(tt.options)
+			got := v.compareValues(tt.expected, tt.actual)
 			if got != tt.want {
-				t.Errorf("compareNullFloat64(%v, %v) = %v, want %v", tt.expected, tt.actual, got, tt.want)
+				t.Errorf("compareValues(%v, %v) = %v, want %v", tt.expected, tt.actual, got, tt.want)
 			}
 		})
 	}
 }
 
 func TestCompareNullDate(t *testing.T) {
-	v := &Validator{}
+	v := newTestValidator()
 	testDate := civil.Date{Year: 2024, Month: 1, Day: 15}
 
 	tests := []struct {
@@ -996,16 +1014,16 @@ func TestCompareNullDate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := v.compareNullDate(tt.expected, tt.actual)
+			got := v.compareValues(tt.expected, tt.actual)
 			if got != tt.want {
-				t.Errorf("compareNullDate(%v, %v) = %v, want %v", tt.expected, tt.actual, got, tt.want)
+				t.Errorf("compareValues(%v, %v) = %v, want %v", tt.expected, tt.actual, got, tt.want)
 			}
 		})
 	}
 }
 
 func TestCompareDate(t *testing.T) {
-	v := &Validator{}
+	v := newTestValidator()
 	testDate := civil.Date{Year: 2024, Month: 1, Day: 15}
 
 	tests := []struct {
@@ -1042,9 +1060,9 @@ func TestCompareDate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := v.compareDate(tt.expected, tt.actual)
+			got := v.compareValues(tt.expected, tt.actual)
 			if got != tt.want {
-				t.Errorf("compareDate(%v, %v) = %v, want %v", tt.expected, tt.actual, got, tt.want)
+				t.Errorf("compareValues(%v, %v) = %v, want %v", tt.expected, tt.actual, got, tt.want)
 			}
 		})
 	}
