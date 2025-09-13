@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"cloud.google.com/go/civil"
 	"cloud.google.com/go/spanner"
 	"github.com/nu0ma/spalidate/internal/config"
 	spannerClient "github.com/nu0ma/spalidate/internal/spanner"
@@ -130,6 +131,17 @@ func (v *Validator) validateData(record any, expectedData any) error {
 	}
 
 	switch r := record.(type) {
+	// DATE
+	case spanner.NullDate:
+		if !r.Valid {
+			if expectedData == nil {
+				return nil
+			}
+			return fmt.Errorf("expected %v, got NULL(date)", expectedData)
+		}
+		return compareDates(r.Date, expectedData)
+	case civil.Date:
+		return compareDates(r, expectedData)
 	case spanner.NullString:
 		if !r.Valid {
 			if expectedData == nil {
@@ -392,6 +404,36 @@ func compareTimestamps(actual time.Time, expected any) error {
 	}
 }
 
+func compareDates(actual civil.Date, expected any) error {
+	switch ev := expected.(type) {
+	case string:
+		// Expect format YYYY-MM-DD
+		t, err := time.Parse("2006-01-02", ev)
+		if err != nil {
+			return fmt.Errorf("invalid date format for expected value (want YYYY-MM-DD): %w", err)
+		}
+		e := civil.Date{Year: t.Year(), Month: t.Month(), Day: t.Day()}
+		if actual != e {
+			return valueMismatchError(actual.String(), e.String())
+		}
+		return nil
+	case civil.Date:
+		if actual != ev {
+			return valueMismatchError(actual.String(), ev.String())
+		}
+		return nil
+	case time.Time:
+		// Convert expected timestamp to date (UTC-based truncation)
+		e := civil.Date{Year: ev.Year(), Month: ev.Month(), Day: ev.Day()}
+		if actual != e {
+			return valueMismatchError(actual.String(), e.String())
+		}
+		return nil
+	default:
+		return typeMismatchError("date(YYYY-MM-DD)", expected)
+	}
+}
+
 func parseTimestamp(s string) (time.Time, error) {
 	// Accept multiple formats in order
 	fmts := []string{
@@ -461,6 +503,19 @@ func toFloat64(v any) (float64, bool) {
 // decodeGenericValue decodes a Spanner GenericColumnValue into supported concrete types.
 // It returns types that validateData can consume (spanner.Null* or primitives).
 func decodeGenericValue(gcv *spanner.GenericColumnValue) (any, error) {
+	// DATE type
+	{
+		var v spanner.NullDate
+		if err := gcv.Decode(&v); err == nil {
+			return v, nil
+		}
+	}
+	{
+		var v civil.Date
+		if err := gcv.Decode(&v); err == nil {
+			return v, nil
+		}
+	}
 	// JSON type
 	{
 		var v spanner.NullJSON
