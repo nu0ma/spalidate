@@ -1,6 +1,5 @@
 tables:
   Users:
-    count: 3
     columns:
       - UserID: "user-001"
         Name: "Alice Johnson"

@@ -1,6 +1,5 @@
 tables:
   Users:
-    count: 3
     columns:
       - UserID: "user-001"
         Name: "Alice Johnson"
@@ -8,7 +7,6 @@ tables:
         Status: 1
         CreatedAt: "2024-01-01T00:00:00Z"
   Products:
-    count: 3
     columns:
       - ProductID: "prod-001"
         Name: "Laptop Computer"
@@ -17,7 +15,6 @@ tables:
         CategoryID: "cat-electronics"
         CreatedAt: "2024-01-01T00:00:00Z"
   Books:
-    count: 3
     columns:
       - BookID: "book-001"
         Title: "The Great Gatsby"
