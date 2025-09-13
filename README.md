@@ -12,9 +12,10 @@ go install github.com/nu0ma/spalidate@latest
 
 1) Start the Spanner emulator and set `SPANNER_EMULATOR_HOST`.
 
-2) Create a minimal YAML (example):
+2) Create expected YAML (example):
 
 ```yaml
+# validation.yaml
 tables:
   Users:
     columns:
@@ -43,20 +44,39 @@ tables:
 3) Run
 
 ```bash
-spalidate \
-  --project proj --instance inst --database db \
-  ./validation.yaml
+spalidate --project <your-project> --instance <your-instance> --database <your-database> ./validation.yaml
 ```
 
 On success: `Validation passed for all tables`
 
-## Flags
+If not successful:
 
-- `-p, --project` (required): Project ID
-- `-i, --instance` (required): Instance ID
-- `-d, --database` (required): Database ID
-- `--port` (default 9010): Emulator port (used when SPANNER_EMULATOR_HOST is not set)
-- `--version`: Show version
+```bash
+2025/09/13 19:09:25 ERRO ✖️ table Books: expected row does not match
+                column mismatch: 1
+```
+              1)  column: JSONData
+                 ▸ expected: {"genre":"Fiction","ratifeawfng":4.5}
+                 ▸   actual: {"genre": "invalid", "rating": 4.5}
+
+            2025/09/13 19:09:25 ERRO ✖️ table Products: expected row does not match
+                column mismatch: 1
+
+              1)  column: CategoryID
+                 ▸ expected: cat-electronieeecs
+                 ▸   actual: cat-electronics
+
+            2025/09/13 19:09:25 ERRO ✖️ table Users: expected row does not match
+                column mismatch: 2
+
+              1)  column: Email
+                 ▸ expected: alice@example.comfeawfa
+                 ▸   actual: alice@example.com
+
+              2)  column: Status
+                 ▸ expected: 999
+                 ▸   actual: 1
+```
 
 
 ## License
