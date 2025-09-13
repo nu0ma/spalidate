@@ -32,20 +32,16 @@ var rootCmd = &cobra.Command{
 	Long: `Spalidate is a CLI tool for validating Google Cloud Spanner database data 
 against YAML configuration files. It connects to Spanner emulator instances 
 and performs comprehensive data validation with flexible type comparison.`,
-	Args:    cobra.ExactArgs(1),
-	Version: version,
+	Args:          cobra.ExactArgs(1),
+	Version:       version,
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// zap 初期化
 		c, err := logging.Init(logLevel, logFormat, verbose)
 		if err != nil {
 			return err
 		}
 		cleanup = c
-		zap.L().Debug("logger initialized",
-			zap.String("level", logLevel),
-			zap.String("format", logFormat),
-			zap.Bool("verbose", verbose),
-		)
 		return nil
 	},
 	RunE: run,
@@ -99,11 +95,13 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("creating spanner client: %w", err)
 	}
 
-	v := validator.NewValidator(cfg, spannerClient)
-	if err := v.Validate(); err != nil {
-		return fmt.Errorf("🚨validation failed: %w", err)
-	}
+    v := validator.NewValidator(cfg, spannerClient)
+    if err := v.Validate(); err != nil {
+        // 失敗詳細はERRORで出力（テストが期待する文言も含む）
+        zap.L().Error("Validation failed", zap.Error(err))
+        return fmt.Errorf("validation failed: %w", err)
+    }
 	zap.L().Info("Validation completed successfully")
-
+	fmt.Println("Validation passed for all tables")
 	return nil
 }
