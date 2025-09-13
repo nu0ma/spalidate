@@ -6,6 +6,7 @@ tables:
         Name: "Alice Johnson"
         Email: "alice@example.com"
         Status: 1
+        CreatedAt: "2024-01-01T00:00:00Z"
   Products:
     count: 3
     columns:

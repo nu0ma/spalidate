@@ -83,5 +83,7 @@ func run(cmd *cobra.Command, args []string) error {
 		log.Println("Validation completed successfully")
 	}
 
+	fmt.Println("Validation passed for all tables")
+
 	return nil
 }

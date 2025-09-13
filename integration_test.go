@@ -34,17 +34,6 @@ func TestMain(m *testing.M) {
 
 	ddls := parseSchemaStatements(string(schemaContent))
 
-	// Add Books table schema for test_validation.yaml
-	booksTableDDL := `CREATE TABLE Books (
-		BookID STRING(36) NOT NULL,
-		Title STRING(200) NOT NULL,
-		Author STRING(100) NOT NULL,
-		PublishedYear INT64 NOT NULL,
-		JSONData STRING(MAX)
-	) PRIMARY KEY (BookID)`
-	ddls = append(ddls, booksTableDDL)
-
-	// Start emulator with schema
 	emulator, clients, teardown, err := spanemuboost.NewEmulatorWithClients(ctx,
 		spanemuboost.WithProjectID(testProject),
 		spanemuboost.WithInstanceID(testInstance),
@@ -103,30 +92,8 @@ func parseSchemaStatements(schema string) []string {
 
 // Helper functions
 
-func runSpalidate(configPath string, verbose bool) (string, error) {
-	// Build the spalidate binary first
-	buildCmd := exec.Command("go", "build", "-o", "spalidate", "main.go")
-	if err := buildCmd.Run(); err != nil {
-		return "", fmt.Errorf("failed to build spalidate: %w", err)
-	}
-
-	// Run spalidate with the test configuration
-	args := []string{
-		"--project", testProject,
-		"--instance", testInstance,
-		"--database", testDatabase,
-		configPath,
-	}
-	if verbose {
-		args = append([]string{"--verbose"}, args...)
-	}
-
-	cmd := exec.Command("./spalidate", args...)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("SPANNER_EMULATOR_HOST=%s", emulatorHost))
-
-	output, err := cmd.CombinedOutput()
-	return string(output), err
-}
+// === Test data (DML) centralized here ===
+var fixedTime = time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
 func runSpalidateWithFile(filePath string, verbose bool) (string, error) {
 	// Build the spalidate binary first
@@ -153,13 +120,76 @@ func runSpalidateWithFile(filePath string, verbose bool) (string, error) {
 	return string(output), err
 }
 
-func cleanupTestData(ctx context.Context, tables ...string) error {
-	for _, table := range tables {
-		_, err := spannerClient.Apply(ctx, []*spanner.Mutation{
-			spanner.Delete(table, spanner.AllKeys()),
-		})
-		if err != nil {
-			return fmt.Errorf("failed to cleanup table %s: %w", table, err)
+func initializeTestData(ctx context.Context) error {
+	if err := insertTestData(ctx, []*spanner.Mutation{
+		spanner.Insert("Books",
+			[]string{"BookID", "Title", "Author", "PublishedYear", "JSONData"},
+			[]interface{}{"book-001", "The Great Gatsby", "F. Scott Fitzgerald", int64(1925), `{"genre": "Fiction", "rating": 4.5}`}),
+		spanner.Insert("Books",
+			[]string{"BookID", "Title", "Author", "PublishedYear", "JSONData"},
+			[]interface{}{"book-002", "To Kill a Mockingbird", "Harper Lee", int64(1960), `{"genre": "Fiction", "rating": 4.8}`}),
+		spanner.Insert("Books",
+			[]string{"BookID", "Title", "Author", "PublishedYear", "JSONData"},
+			[]interface{}{"book-003", "1984", "George Orwell", int64(1949), `{"genre": "Dystopian", "rating": 4.6}`}),
+	}); err != nil {
+		return fmt.Errorf("failed to insert test users: %w", err)
+	}
+	if err := insertTestData(ctx, []*spanner.Mutation{
+		spanner.Insert("Products",
+			[]string{"ProductID", "Name", "Price", "IsActive", "CategoryID", "CreatedAt"},
+			[]interface{}{"prod-001", "Laptop Computer", int64(150000), true, "cat-electronics", fixedTime}),
+		spanner.Insert("Products",
+			[]string{"ProductID", "Name", "Price", "IsActive", "CategoryID", "CreatedAt"},
+			[]interface{}{"prod-002", "Wireless Mouse", int64(3000), true, "cat-electronics", fixedTime}),
+		spanner.Insert("Products",
+			[]string{"ProductID", "Name", "Price", "IsActive", "CategoryID", "CreatedAt"},
+			[]interface{}{"prod-003", "Coffee Mug", int64(1200), false, "cat-kitchen", fixedTime}),
+	}); err != nil {
+		return fmt.Errorf("failed to insert test products: %w", err)
+	}
+	if err := insertTestData(ctx, []*spanner.Mutation{
+		spanner.Insert("Users",
+			[]string{"UserID", "Name", "Email", "Status", "CreatedAt"},
+			[]interface{}{"user-001", "Alice Johnson", "alice@example.com", int64(1), fixedTime}),
+		spanner.Insert("Users",
+			[]string{"UserID", "Name", "Email", "Status", "CreatedAt"},
+			[]interface{}{"user-002", "Bob Smith", "bob@example.com", int64(2), fixedTime}),
+		spanner.Insert("Users",
+			[]string{"UserID", "Name", "Email", "Status", "CreatedAt"},
+			[]interface{}{"user-003", "Charlie Brown", "charlie@example.com", int64(1), fixedTime}),
+	}); err != nil {
+		return fmt.Errorf("failed to insert test books: %w", err)
+	}
+	return nil
+}
+
+func cleanupTestData(ctx context.Context) error {
+	stmt := spanner.Statement{SQL: `
+        SELECT t.table_name
+        FROM information_schema.tables AS t
+        WHERE t.table_catalog = '' AND t.table_schema = ''
+    `}
+
+	iter := spannerClient.Single().Query(ctx, stmt)
+	defer iter.Stop()
+
+	var tableNames []string
+	err := iter.Do(func(row *spanner.Row) error {
+		var name string
+		if err := row.Columns(&name); err != nil {
+			return err
+		}
+		tableNames = append(tableNames, name)
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list tables: %w", err)
+	}
+
+	for _, tbl := range tableNames {
+		stmtDel := spanner.Statement{SQL: fmt.Sprintf("DELETE FROM %s WHERE TRUE", tbl)}
+		if _, err := spannerClient.PartitionedUpdate(ctx, stmtDel); err != nil {
+			return fmt.Errorf("failed to cleanup table %s: %w", tbl, err)
 		}
 	}
 	return nil
@@ -177,55 +207,11 @@ func TestCLIValidation(t *testing.T) {
 
 	t.Run("TestWithExistingValidationFile", func(t *testing.T) {
 		// Clean up first
-		if err := cleanupTestData(ctx, "Users", "Products", "Books"); err != nil {
+		if err := cleanupTestData(ctx); err != nil {
 			t.Fatal(err)
 		}
 
-		// Insert test data for Users
-		userMutations := []*spanner.Mutation{
-			spanner.Insert("Users",
-				[]string{"UserID", "Name", "Email", "Status", "CreatedAt"},
-				[]interface{}{"user-001", "Alice Johnson", "alice@example.com", int64(1), spanner.CommitTimestamp}),
-			spanner.Insert("Users",
-				[]string{"UserID", "Name", "Email", "Status", "CreatedAt"},
-				[]interface{}{"user-002", "Bob Smith", "bob@example.com", int64(2), spanner.CommitTimestamp}),
-			spanner.Insert("Users",
-				[]string{"UserID", "Name", "Email", "Status", "CreatedAt"},
-				[]interface{}{"user-003", "Charlie Brown", "charlie@example.com", int64(1), spanner.CommitTimestamp}),
-		}
-		if err := insertTestData(ctx, userMutations); err != nil {
-			t.Fatal(err)
-		}
-
-		// Insert test data for Products
-		productMutations := []*spanner.Mutation{
-			spanner.Insert("Products",
-				[]string{"ProductID", "Name", "Price", "IsActive", "CategoryID", "CreatedAt"},
-				[]interface{}{"prod-001", "Laptop Computer", int64(150000), true, "cat-electronics", time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}),
-			spanner.Insert("Products",
-				[]string{"ProductID", "Name", "Price", "IsActive", "CategoryID", "CreatedAt"},
-				[]interface{}{"prod-002", "Wireless Mouse", int64(3000), true, "cat-electronics", spanner.CommitTimestamp}),
-			spanner.Insert("Products",
-				[]string{"ProductID", "Name", "Price", "IsActive", "CategoryID", "CreatedAt"},
-				[]interface{}{"prod-003", "Coffee Mug", int64(1200), false, "cat-kitchen", spanner.CommitTimestamp}),
-		}
-		if err := insertTestData(ctx, productMutations); err != nil {
-			t.Fatal(err)
-		}
-
-		// Insert test data for Books
-		bookMutations := []*spanner.Mutation{
-			spanner.Insert("Books",
-				[]string{"BookID", "Title", "Author", "PublishedYear", "JSONData"},
-				[]interface{}{"book-001", "The Great Gatsby", "F. Scott Fitzgerald", int64(1925), `{"genre": "Fiction", "rating": 4.5}`}),
-			spanner.Insert("Books",
-				[]string{"BookID", "Title", "Author", "PublishedYear", "JSONData"},
-				[]interface{}{"book-002", "To Kill a Mockingbird", "Harper Lee", int64(1960), `{"genre": "Fiction", "rating": 4.8}`}),
-			spanner.Insert("Books",
-				[]string{"BookID", "Title", "Author", "PublishedYear", "JSONData"},
-				[]interface{}{"book-003", "1984", "George Orwell", int64(1949), `{"genre": "Dystopian", "rating": 4.6}`}),
-		}
-		if err := insertTestData(ctx, bookMutations); err != nil {
+		if err := initializeTestData(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -241,4 +227,38 @@ func TestCLIValidation(t *testing.T) {
 		}
 	})
 
+	t.Run("TestMultipleColumnsMatching_Success", func(t *testing.T) {
+		if err := cleanupTestData(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := initializeTestData(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		output, err := runSpalidateWithFile("test_multi_columns.yaml", true)
+		if err != nil {
+			t.Fatalf("Validation should succeed, got error: %v\nOutput: %s", err, output)
+		}
+		if !strings.Contains(output, "Validation passed for all tables") {
+			t.Errorf("Expected success message, got: %s", output)
+		}
+	})
+
+	t.Run("TestMultipleColumnsMatching_Failure", func(t *testing.T) {
+		if err := cleanupTestData(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := initializeTestData(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		output, err := runSpalidateWithFile("test_multi_columns_fail.yaml", true)
+		if err == nil {
+			t.Fatalf("Validation should fail but succeeded. Output: %s", output)
+		}
+		if !(strings.Contains(output, "no row strictly matched spec") || strings.Contains(output, "no row matched expected spec")) {
+			t.Errorf("Expected failure reason about unmatched spec. Output: %s", output)
+		}
+	})
 }

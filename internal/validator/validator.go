@@ -2,7 +2,12 @@ package validator
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"reflect"
+	"strings"
+	"time"
 
 	"cloud.google.com/go/spanner"
 	"github.com/nu0ma/spalidate/internal/config"
@@ -40,14 +45,19 @@ func (v *Validator) validateTable(ctx context.Context, tableName string, tableCo
 	defer iter.Stop()
 
 	var rows []map[string]any
+	// カラムデータ読み込み
 	err := iter.Do(func(row *spanner.Row) error {
 		columnNames := row.ColumnNames()
 		rowData := make(map[string]any)
 
 		for i, colName := range columnNames {
-			var val any
-			if err := row.Column(i, &val); err != nil {
+			var gcv spanner.GenericColumnValue
+			if err := row.Column(i, &gcv); err != nil {
 				return fmt.Errorf("failed to get column %s: %w", colName, err)
+			}
+			val, derr := decodeGenericValue(&gcv)
+			if derr != nil {
+				return fmt.Errorf("failed to decode column %s: %w", colName, derr)
 			}
 			rowData[colName] = val
 		}
@@ -71,21 +81,32 @@ func (v *Validator) validateTable(ctx context.Context, tableName string, tableCo
 		return fmt.Errorf("row count mismatch: expected %d, got %d", tableConfig.Count, len(rows))
 	}
 
-	// columnsが設定されている場合は最初の行を検証
+	// columns が設定されている場合は厳密一致（全カラム）で「少なくとも1行が一致」することを検証
 	if len(tableConfig.Columns) > 0 && len(rows) > 0 {
-		expectedData := tableConfig.Columns[0]
-		actualData := rows[0]
-
-		for key, expectedValue := range expectedData {
-			actualValue, exists := actualData[key]
-			if !exists {
-				return fmt.Errorf("column %s not found in actual data", key)
+		for _, expectedData := range tableConfig.Columns {
+			matched := false
+			for _, actualData := range rows {
+				// キー集合が完全一致している必要がある
+				if !sameKeySet(actualData, expectedData) {
+					continue
+				}
+				// 全カラム比較
+				ok := true
+				for key, actualValue := range actualData {
+					expectedValue := expectedData[key]
+					if err := v.validateData(actualValue, expectedValue); err != nil {
+						ok = false
+						break
+					}
+				}
+				if ok {
+					matched = true
+					break
+				}
 			}
-
-			if err := v.validateData(actualValue, expectedValue); err != nil {
-				return fmt.Errorf("column %s validation failed: %w", key, err)
+			if !matched {
+				return fmt.Errorf("no row strictly matched spec (all columns required): %v", expectedData)
 			}
-
 		}
 	}
 
@@ -93,8 +114,418 @@ func (v *Validator) validateTable(ctx context.Context, tableName string, tableCo
 }
 
 func (v *Validator) validateData(record any, expectedData any) error {
-	fmt.Printf("record: %+v\n", record)
-	fmt.Printf("expectedData: %+v\n", expectedData)
-	// TODO: ここにバリデーションのロジックを書く
+	// nil/NULL の扱い
+	if isSpannerNull(record) {
+		if expectedData == nil {
+			return nil
+		}
+		return fmt.Errorf("expected non-null, got NULL (expected=%v)", expectedData)
+	}
+	if record == nil {
+		if expectedData == nil {
+			return nil
+		}
+		return fmt.Errorf("expected %v, got <nil>", expectedData)
+	}
+
+	switch r := record.(type) {
+	case spanner.NullString:
+		if !r.Valid {
+			if expectedData == nil {
+				return nil
+			}
+			return fmt.Errorf("expected %v, got NULL(string)", expectedData)
+		}
+		return compareStrings(r.StringVal, expectedData)
+	case string:
+		return compareStrings(r, expectedData)
+	case spanner.NullInt64:
+		if !r.Valid {
+			if expectedData == nil {
+				return nil
+			}
+			return fmt.Errorf("expected %v, got NULL(int64)", expectedData)
+		}
+		return compareNumbers(r.Int64, expectedData)
+	case int64:
+		return compareNumbers(r, expectedData)
+	case spanner.NullFloat64:
+		if !r.Valid {
+			if expectedData == nil {
+				return nil
+			}
+			return fmt.Errorf("expected %v, got NULL(float64)", expectedData)
+		}
+		return compareNumbers(r.Float64, expectedData)
+	case float64:
+		return compareNumbers(r, expectedData)
+
+	// JSON (SpannerのJSON型)
+	case spanner.NullJSON:
+		if !r.Valid {
+			if expectedData == nil {
+				return nil
+			}
+			return fmt.Errorf("expected %v, got NULL(json)", expectedData)
+		}
+		return compareJSON(r.Value, expectedData)
+	case spanner.NullBool:
+		if !r.Valid {
+			if expectedData == nil {
+				return nil
+			}
+			return fmt.Errorf("expected %v, got NULL(bool)", expectedData)
+		}
+		ev, ok := expectedData.(bool)
+		if !ok {
+			return typeMismatchError("bool", expectedData)
+		}
+		if r.Bool != ev {
+			return valueMismatchError(r.Bool, ev)
+		}
+		return nil
+	case bool:
+		ev, ok := expectedData.(bool)
+		if !ok {
+			return typeMismatchError("bool", expectedData)
+		}
+		if r != ev {
+			return valueMismatchError(r, ev)
+		}
+		return nil
+	case spanner.NullTime:
+		if !r.Valid {
+			if expectedData == nil {
+				return nil
+			}
+			return fmt.Errorf("expected %v, got NULL(timestamp)", expectedData)
+		}
+		return compareTimestamps(r.Time, expectedData)
+	case time.Time:
+		return compareTimestamps(r, expectedData)
+	}
+
+	return fmt.Errorf("unsupported type: %T (value=%v)", record, record)
+}
+
+// --- Helpers ---
+
+func isSpannerNull(v any) bool {
+	switch x := v.(type) {
+	case spanner.NullString:
+		return !x.Valid
+	case spanner.NullInt64:
+		return !x.Valid
+	case spanner.NullFloat64:
+		return !x.Valid
+	case spanner.NullBool:
+		return !x.Valid
+	case spanner.NullTime:
+		return !x.Valid
+	default:
+		return false
+	}
+}
+
+func typeMismatchError(expectedKind string, got any) error {
+	return fmt.Errorf("type mismatch: expected %s, got %T (value=%v)", expectedKind, got, got)
+}
+
+func valueMismatchError(actual, expected any) error {
+	return fmt.Errorf("value mismatch: actual=%v, expected=%v", actual, expected)
+}
+
+func compareStrings(actual string, expected any) error {
+	switch ev := expected.(type) {
+	case string:
+		// 期待値がJSONっぽい場合はJSONとして比較
+		if looksLikeJSON(ev) {
+			var a any
+			if err := json.Unmarshal([]byte(actual), &a); err != nil {
+				return fmt.Errorf("actual is not valid JSON: %w", err)
+			}
+			var e any
+			if err := json.Unmarshal([]byte(ev), &e); err != nil {
+				return fmt.Errorf("expected is not valid JSON: %w", err)
+			}
+			if !deepEqualJSON(a, e) {
+				// 差分表現は簡潔に
+				aa, _ := json.Marshal(a)
+				ee, _ := json.Marshal(e)
+				return valueMismatchError(string(aa), string(ee))
+			}
+			return nil
+		}
+		if actual != ev {
+			return valueMismatchError(actual, ev)
+		}
+		return nil
+	default:
+		// YAMLの数値やboolが来るケースを考慮し文字列化比較は避け、型不一致を返す
+		return typeMismatchError("string", expected)
+	}
+}
+
+// JSON比較（Spanner JSON or 汎用）
+func compareJSON(actual any, expected any) error {
+	var a any
+	var e any
+
+	// actual 側の正規化
+	switch v := actual.(type) {
+	case string:
+		if err := json.Unmarshal([]byte(v), &a); err != nil {
+			return fmt.Errorf("actual is not valid JSON: %w", err)
+		}
+	default:
+		// Spanner NullJSON.Value は既にmap/slice想定
+		a = v
+	}
+
+	// expected 側の正規化
+	switch v := expected.(type) {
+	case string:
+		if !looksLikeJSON(v) {
+			return typeMismatchError("json(string)", expected)
+		}
+		if err := json.Unmarshal([]byte(v), &e); err != nil {
+			return fmt.Errorf("expected is not valid JSON: %w", err)
+		}
+	default:
+		// map[string]any / []any 等も受け入れ
+		e = v
+	}
+
+	if !deepEqualJSON(a, e) {
+		aa, _ := json.Marshal(a)
+		ee, _ := json.Marshal(e)
+		return valueMismatchError(string(aa), string(ee))
+	}
 	return nil
+}
+
+func looksLikeJSON(s string) bool {
+	t := strings.TrimSpace(s)
+	return (strings.HasPrefix(t, "{") && strings.HasSuffix(t, "}")) ||
+		(strings.HasPrefix(t, "[") && strings.HasSuffix(t, "]"))
+}
+
+func deepEqualJSON(a, b any) bool {
+	// JSON数値はfloat64になるので、そのままDeepEqualでOK。
+	return reflect.DeepEqual(a, b)
+}
+
+// sameKeySet は2つのmapのキー集合が完全一致か判定する
+func sameKeySet(a, b map[string]any) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k := range a {
+		if _, ok := b[k]; !ok {
+			return false
+		}
+	}
+	for k := range b {
+		if _, ok := a[k]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func compareNumbers(actual any, expected any) error {
+	// actual は int64 か float64 を想定
+	avInt, aIsInt := toInt64(actual)
+	avFloat, aIsFloat := toFloat64(actual)
+
+	// expected は int, int64, float64 を許容
+	evInt, eIsInt := toInt64(expected)
+	evFloat, eIsFloat := toFloat64(expected)
+
+	switch {
+	case aIsInt && eIsInt:
+		if avInt != evInt {
+			return valueMismatchError(avInt, evInt)
+		}
+		return nil
+	case aIsFloat && eIsFloat:
+		// 浮動小数は許容誤差なし（要件簡易化）。必要なら誤差許容を追加。
+		if avFloat != evFloat {
+			return valueMismatchError(avFloat, evFloat)
+		}
+		return nil
+	case aIsInt && eIsFloat:
+		if float64(avInt) != evFloat {
+			return valueMismatchError(float64(avInt), evFloat)
+		}
+		return nil
+	case aIsFloat && eIsInt:
+		if avFloat != float64(evInt) {
+			return valueMismatchError(avFloat, float64(evInt))
+		}
+		return nil
+	default:
+		return typeMismatchError("number", expected)
+	}
+}
+
+func compareTimestamps(actual time.Time, expected any) error {
+	switch ev := expected.(type) {
+	case string:
+		// RFC3339系を優先してパース
+		t, err := parseTimestamp(ev)
+		if err != nil {
+			return fmt.Errorf("invalid timestamp format for expected value: %w", err)
+		}
+		if !actual.Equal(t) {
+			return valueMismatchError(actual.UTC().Format(time.RFC3339Nano), t.UTC().Format(time.RFC3339Nano))
+		}
+		return nil
+	case time.Time:
+		if !actual.Equal(ev) {
+			return valueMismatchError(actual.UTC().Format(time.RFC3339Nano), ev.UTC().Format(time.RFC3339Nano))
+		}
+		return nil
+	default:
+		return typeMismatchError("timestamp(string RFC3339)", expected)
+	}
+}
+
+func parseTimestamp(s string) (time.Time, error) {
+	// 試行順に複数フォーマットを受け入れる
+	fmts := []string{
+		time.RFC3339Nano,
+		time.RFC3339,
+		"2006-01-02 15:04:05Z07:00",
+		"2006-01-02 15:04:05",
+		"2006-01-02",
+	}
+	var lastErr error
+	for _, f := range fmts {
+		if t, err := time.Parse(f, s); err == nil {
+			return t, nil
+		} else {
+			lastErr = err
+		}
+	}
+	if lastErr == nil {
+		lastErr = errors.New("unknown time parse error")
+	}
+	return time.Time{}, lastErr
+}
+
+func toInt64(v any) (int64, bool) {
+	switch x := v.(type) {
+	case int:
+		return int64(x), true
+	case int8:
+		return int64(x), true
+	case int16:
+		return int64(x), true
+	case int32:
+		return int64(x), true
+	case int64:
+		return x, true
+	default:
+		rv := reflect.ValueOf(v)
+		if rv.IsValid() && rv.Kind() >= reflect.Int && rv.Kind() <= reflect.Int64 {
+			return rv.Int(), true
+		}
+		return 0, false
+	}
+}
+
+func toFloat64(v any) (float64, bool) {
+	switch x := v.(type) {
+	case float32:
+		return float64(x), true
+	case float64:
+		return x, true
+	case int:
+		return float64(x), true
+	case int64:
+		return float64(x), true
+	default:
+		rv := reflect.ValueOf(v)
+		switch rv.Kind() {
+		case reflect.Float32, reflect.Float64:
+			return rv.Float(), true
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			return float64(rv.Int()), true
+		}
+		return 0, false
+	}
+}
+
+// decodeGenericValue は Spanner の GenericColumnValue をサポートする代表的な型へデコードする。
+// 返り値は validateData がそのまま扱える型（spanner.Null* もしくはプリミティブ）。
+func decodeGenericValue(gcv *spanner.GenericColumnValue) (any, error) {
+	// JSON型
+	{
+		var v spanner.NullJSON
+		if err := gcv.Decode(&v); err == nil {
+			return v, nil
+		}
+	}
+	{
+		var v spanner.NullString
+		if err := gcv.Decode(&v); err == nil {
+			return v, nil
+		}
+	}
+	{
+		var v spanner.NullInt64
+		if err := gcv.Decode(&v); err == nil {
+			return v, nil
+		}
+	}
+	{
+		var v spanner.NullFloat64
+		if err := gcv.Decode(&v); err == nil {
+			return v, nil
+		}
+	}
+	{
+		var v spanner.NullBool
+		if err := gcv.Decode(&v); err == nil {
+			return v, nil
+		}
+	}
+	{
+		var v spanner.NullTime
+		if err := gcv.Decode(&v); err == nil {
+			return v, nil
+		}
+	}
+	{
+		var v string
+		if err := gcv.Decode(&v); err == nil {
+			return v, nil
+		}
+	}
+	{
+		var v int64
+		if err := gcv.Decode(&v); err == nil {
+			return v, nil
+		}
+	}
+	{
+		var v float64
+		if err := gcv.Decode(&v); err == nil {
+			return v, nil
+		}
+	}
+	{
+		var v bool
+		if err := gcv.Decode(&v); err == nil {
+			return v, nil
+		}
+	}
+	{
+		var v time.Time
+		if err := gcv.Decode(&v); err == nil {
+			return v, nil
+		}
+	}
+	return nil, fmt.Errorf("unsupported column type: %v", gcv.Type)
 }

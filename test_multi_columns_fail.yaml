@@ -1,0 +1,14 @@
+tables:
+  Users:
+    count: 3
+    columns:
+      - UserID: "user-001"
+        Name: "Alice Johnson"
+        Email: "alice@example.com"
+        Status: 1
+        CreatedAt: "2024-01-01T00:00:00Z"
+      - UserID: "user-999"
+        Name: "Ghost User"
+        Email: "ghost@example.com"
+        Status: 9
+        CreatedAt: "2024-01-01T00:00:00Z"
