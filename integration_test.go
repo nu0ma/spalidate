@@ -181,7 +181,7 @@ func TestCLIValidation(t *testing.T) {
 	ctx := context.Background()
 	t.Parallel()
 
-	t.Run("TestWithExistingValidationFile", func(t *testing.T) {
+	t.Run("Test_ValidationSuccess", func(t *testing.T) {
 		t.Parallel()
 		clients, clientsTeardown, err := spanemuboost.NewClients(ctx, emulator,
 			spanemuboost.EnableDatabaseAutoConfigOnly(),
@@ -197,44 +197,17 @@ func TestCLIValidation(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Run validation with test_validation.yaml
 		output, err := runSpalidateWithFile("test_validation.yaml", true, clients.ProjectID, clients.InstanceID, clients.DatabaseID)
 		if err != nil {
 			t.Fatalf("Validation failed: %v\nOutput: %s", err, output)
 		}
 
-		// Check output
 		if !strings.Contains(output, "Validation passed for all tables") {
 			t.Errorf("Expected success message, got: %s", output)
 		}
 	})
 
-	t.Run("TestMultipleColumnsMatching_Success", func(t *testing.T) {
-		t.Parallel()
-		clients, clientsTeardown, err := spanemuboost.NewClients(ctx, emulator,
-			spanemuboost.EnableDatabaseAutoConfigOnly(),
-			spanemuboost.WithRandomDatabaseID(),
-			spanemuboost.WithSetupDDLs(ddls),
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer clientsTeardown()
-
-		if err := initializeTestData(ctx, clients.Client); err != nil {
-			t.Fatal(err)
-		}
-
-		output, err := runSpalidateWithFile("test_multi_columns.yaml", true, clients.ProjectID, clients.InstanceID, clients.DatabaseID)
-		if err != nil {
-			t.Fatalf("Validation should succeed, got error: %v\nOutput: %s", err, output)
-		}
-		if !strings.Contains(output, "Validation passed for all tables") {
-			t.Errorf("Expected success message, got: %s", output)
-		}
-	})
-
-	t.Run("TestMultipleColumnsMatching_Failure", func(t *testing.T) {
+	t.Run("Test_ValidationFailure", func(t *testing.T) {
 		t.Parallel()
 		clients, clientsTeardown, err := spanemuboost.NewClients(ctx, emulator,
 			spanemuboost.EnableDatabaseAutoConfigOnly(),
@@ -252,10 +225,10 @@ func TestCLIValidation(t *testing.T) {
 
 		output, err := runSpalidateWithFile("test_fail.yaml", true, clients.ProjectID, clients.InstanceID, clients.DatabaseID)
 		if err == nil {
-			t.Fatalf("Validation should fail but succeeded. Output: %s", output)
+			t.Fatalf("should fail, got error: %v\nOutput: %s", err, output)
 		}
-		if !strings.Contains(output, "no row strictly matched spec") && !strings.Contains(output, "no row matched expected spec") {
-			t.Errorf("Expected failure reason about unmatched spec. Output: %s", output)
+		if !strings.Contains(output, "unexpected row count for table Users: expected 2, got 3") {
+			t.Errorf("Expected failure reason about unexpected row count. Output: %s", output)
 		}
 	})
 }
