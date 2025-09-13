@@ -1,37 +1,78 @@
 package logging
 
 import (
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
+	stdlog "log"
+	"os"
+	"strings"
+
+	chlog "github.com/charmbracelet/log"
+	"github.com/muesli/termenv"
 )
 
-func Init(level, format string, verbose bool) (func(), error) {
-	var cfg zap.Config
-	if format == "json" {
-		cfg = zap.NewProductionConfig()
-	} else {
-		cfg = zap.NewDevelopmentConfig()
+var defaultLogger *chlog.Logger
+
+// colorMode: "auto" | "always" | "never"
+func Init(level, format string, verbose bool, colorMode string) (func(), error) {
+	l := chlog.NewWithOptions(os.Stderr, chlog.Options{ReportTimestamp: true})
+
+	switch {
+	case verbose:
+		l.SetLevel(chlog.DebugLevel)
+	default:
+		switch strings.ToLower(level) {
+		case "debug":
+			l.SetLevel(chlog.DebugLevel)
+		case "warn", "warning":
+			l.SetLevel(chlog.WarnLevel)
+		case "error":
+			l.SetLevel(chlog.ErrorLevel)
+		default:
+			l.SetLevel(chlog.InfoLevel)
+		}
+	}
+	if strings.EqualFold(format, "json") {
+		l.SetFormatter(chlog.JSONFormatter)
+	}
+	// カラー強制/禁止（TextFormatter時のみ意味がある）
+	if !strings.EqualFold(format, "json") {
+		switch strings.ToLower(colorMode) {
+		case "always":
+			l.SetColorProfile(termenv.TrueColor)
+		case "never":
+			l.SetColorProfile(termenv.Ascii)
+		}
 	}
 
-	var lvl zapcore.Level
-	if verbose {
-		lvl = zapcore.DebugLevel
-	} else if err := lvl.UnmarshalText([]byte(level)); err != nil {
-		lvl = zapcore.InfoLevel
-	}
-	cfg.Level = zap.NewAtomicLevelAt(lvl)
+	prevWriter := stdlog.Writer()
+	prevFlags := stdlog.Flags()
+	prevPrefix := stdlog.Prefix()
+	stdlog.SetFlags(0)
+	stdlog.SetPrefix("")
+	stdlog.SetOutput(&stdLogAdapter{L: l})
 
-	logger, err := cfg.Build()
-	if err != nil {
-		return nil, err
-	}
-
-	zap.ReplaceGlobals(logger)
-	undo := zap.RedirectStdLog(logger)
+	defaultLogger = l
 
 	cleanup := func() {
-		_ = logger.Sync()
-		undo()
+		stdlog.SetOutput(prevWriter)
+		stdlog.SetFlags(prevFlags)
+		stdlog.SetPrefix(prevPrefix)
 	}
 	return cleanup, nil
+}
+
+func L() *chlog.Logger {
+	if defaultLogger == nil {
+		defaultLogger = chlog.New(os.Stderr)
+	}
+	return defaultLogger
+}
+
+type stdLogAdapter struct{ L *chlog.Logger }
+
+func (w *stdLogAdapter) Write(p []byte) (int, error) {
+	msg := strings.TrimRight(string(p), "\r\n")
+	if msg != "" {
+		w.L.Info(msg)
+	}
+	return len(p), nil
 }

@@ -10,7 +10,6 @@ import (
 	"github.com/nu0ma/spalidate/internal/spanner"
 	"github.com/nu0ma/spalidate/internal/validator"
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 )
 
 const version = "v1.0.0"
@@ -24,6 +23,7 @@ var (
 	logLevel  string
 	logFormat string
 	cleanup   func()
+	colorMode string
 )
 
 var rootCmd = &cobra.Command{
@@ -37,7 +37,10 @@ and performs comprehensive data validation with flexible type comparison.`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		c, err := logging.Init(logLevel, logFormat, verbose)
+		if env := os.Getenv("SPALIDATE_COLOR"); env != "" && colorMode == "auto" {
+			colorMode = env
+		}
+		c, err := logging.Init(logLevel, logFormat, verbose, colorMode)
 		if err != nil {
 			return err
 		}
@@ -55,6 +58,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging (sets level=debug)")
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "Log level: debug, info, warn, error")
 	rootCmd.PersistentFlags().StringVar(&logFormat, "log-format", "console", "Log format: console or json")
+	rootCmd.PersistentFlags().StringVar(&colorMode, "color", "auto", "Color: auto, always, never")
 
 	rootCmd.MarkPersistentFlagRequired("project")
 	rootCmd.MarkPersistentFlagRequired("instance")
@@ -73,12 +77,12 @@ func run(cmd *cobra.Command, args []string) error {
 	if cleanup != nil {
 		defer cleanup()
 	}
-	zap.L().Info("Starting spalidate validation",
-		zap.String("config", configPath),
-		zap.String("project", project),
-		zap.String("instance", instance),
-		zap.String("database", database),
-		zap.Int("port", port),
+	logging.L().Info("Starting spalidate validation",
+		"config", configPath,
+		"project", project,
+		"instance", instance,
+		"database", database,
+		"port", port,
 	)
 
 	cfg, err := config.LoadConfig(configPath)
@@ -86,22 +90,19 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	zap.L().Debug("Loaded config",
-		zap.Int("tables", len(cfg.Tables)),
-	)
+	logging.L().Debug("Loaded config", "tables", len(cfg.Tables))
 
 	spannerClient, err := spanner.NewClient(ctx, project, instance, database)
 	if err != nil {
 		return fmt.Errorf("creating spanner client: %w", err)
 	}
 
-    v := validator.NewValidator(cfg, spannerClient)
-    if err := v.Validate(); err != nil {
-        // 失敗詳細はERRORで出力（テストが期待する文言も含む）
-        zap.L().Error("Validation failed", zap.Error(err))
-        return fmt.Errorf("validation failed: %w", err)
-    }
-	zap.L().Info("Validation completed successfully")
+	v := validator.NewValidator(cfg, spannerClient)
+	if err := v.Validate(); err != nil {
+		logging.L().Error("Validation failed", "error", err)
+		return fmt.Errorf("validation failed: %w", err)
+	}
+	logging.L().Info("Validation completed successfully")
 	fmt.Println("Validation passed for all tables")
 	return nil
 }

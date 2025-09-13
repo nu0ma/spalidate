@@ -26,6 +26,7 @@ spalidate --project=test-project --instance=test-instance --database=test-databa
 - `--verbose`: Enable verbose logging (equivalent to `--log-level=debug`)
 - `--log-level`: Log level (`debug`, `info`, `warn`, `error`) default: `info`
 - `--log-format`: Log format (`console`, `json`) default: `console`
+- `--color`: Color mode (`auto`, `always`, `never`) default: `auto`
 - `--help`: Show help information
 
 ### Positional Arguments
@@ -82,6 +83,14 @@ spalidate \
   --project=test-project --instance=test-instance --database=test-database \
   --log-level=info --log-format=json ./validation.yaml
 ```
+
+### 強制的にカラーを有効化（CI/テストなど非TTY）
+```bash
+spalidate \
+  --project=test-project --instance=test-instance --database=test-database \
+  --log-level=debug --log-format=console --color=always ./validation.yaml
+```
+環境変数での制御も可能（例: `SPALIDATE_COLOR=always` に対応予定）。
 
 ## Logging
 
