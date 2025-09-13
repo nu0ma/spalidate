@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -21,19 +22,14 @@ tables:
         Price: 1000
         IsActive: true
 `
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "test-config.yaml")
 
-	tmpFile, err := os.CreateTemp("", "test-config-*.yaml")
-	if err != nil {
+	if err := os.WriteFile(tmpFile, []byte(yamlContent), 0644); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpFile.Name())
 
-	if _, err := tmpFile.WriteString(yamlContent); err != nil {
-		t.Fatal(err)
-	}
-	tmpFile.Close()
-
-	config, err := LoadConfig(tmpFile.Name())
+	config, err := LoadConfig(tmpFile)
 	if err != nil {
 		t.Fatalf("LoadConfig failed: %v", err)
 	}
@@ -49,6 +45,18 @@ tables:
 
 	if usersTable.Columns[0]["UserID"] != "user-001" {
 		t.Errorf("Expected UserID 'user-001', got %v", usersTable.Columns[0]["UserID"])
+	}
+
+	if usersTable.Columns[0]["Name"] != "Test User" {
+		t.Errorf("Expected Name 'Test User', got %v", usersTable.Columns[0]["Name"])
+	}
+
+	if usersTable.Columns[0]["Email"] != "test@example.com" {
+		t.Errorf("Expected Email 'test@example.com', got %v", usersTable.Columns[0]["Email"])
+	}
+
+	if usersTable.Columns[0]["Status"] != 1 {
+		t.Errorf("Expected Status 1, got %v", usersTable.Columns[0]["Status"])
 	}
 
 }
