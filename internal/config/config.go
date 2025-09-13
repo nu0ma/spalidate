@@ -12,8 +12,7 @@ type Config struct {
 }
 
 type TableConfig struct {
-	Count   int              `yaml:"count"`
-	Columns []map[string]any `yaml:"columns,omitempty"`
+    Columns []map[string]any `yaml:"columns,omitempty"`
 }
 
 func LoadConfig(path string) (*Config, error) {
