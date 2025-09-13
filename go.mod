@@ -1,14 +1,14 @@
 module github.com/nu0ma/spalidate
 
-go 1.24.5
+go 1.25.1
 
 require (
 	cloud.google.com/go v0.121.3
 	cloud.google.com/go/spanner v1.83.0
 	github.com/apstndb/spanemuboost v0.2.13
 	github.com/charmbracelet/log v0.4.2
-	github.com/google/go-cmp v0.7.0
 	github.com/spf13/cobra v1.10.1
+	github.com/testcontainers/testcontainers-go/modules/gcloud v0.37.0
 	google.golang.org/api v0.240.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -86,7 +86,6 @@ require (
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
 	github.com/stretchr/testify v1.10.0 // indirect
 	github.com/testcontainers/testcontainers-go v0.37.0 // indirect
-	github.com/testcontainers/testcontainers-go/modules/gcloud v0.37.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect

@@ -93,7 +93,7 @@ func run(cmd *cobra.Command, args []string) error {
 	if port != 0 && os.Getenv("SPANNER_EMULATOR_HOST") == "" {
 		opts.EmulatorHost = fmt.Sprintf("localhost:%d", port)
 	}
-	
+
 	spannerClient, err := spanner.NewClient(ctx, project, instance, database, opts)
 	if err != nil {
 		return fmt.Errorf("creating spanner client: %w", err)
@@ -105,6 +105,7 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("validation failed: %w", err)
 	}
 	logging.L().Info("Validation completed successfully")
+
 	fmt.Println("Validation passed for all tables")
 	return nil
 }
