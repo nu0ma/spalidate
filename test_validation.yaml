@@ -6,6 +6,16 @@ tables:
         Email: "alice@example.com"
         Status: 1
         CreatedAt: "2024-01-01T00:00:00Z"
+      - UserID: "user-002"
+        Name: "Bob Smith"
+        Email: "bob@example.com"
+        Status: 2
+        CreatedAt: "2024-01-01T00:00:00Z"
+      - UserID: "user-003"
+        Name: "Charlie Brown"
+        Email: "charlie@example.com"
+        Status: 1
+        CreatedAt: "2024-01-01T00:00:00Z"
   Products:
     columns:
       - ProductID: "prod-001"
@@ -14,6 +24,18 @@ tables:
         IsActive: true
         CategoryID: "cat-electronics"
         CreatedAt: "2024-01-01T00:00:00Z"
+      - ProductID: "prod-002"
+        Name: "Wireless Mouse"
+        Price: 3000
+        IsActive: true
+        CategoryID: "cat-electronics"
+        CreatedAt: "2024-01-01T00:00:00Z"
+      - ProductID: "prod-003"
+        Name: "Coffee Mug"
+        Price: 1200
+        IsActive: false
+        CategoryID: "cat-kitchen"
+        CreatedAt: "2024-01-01T00:00:00Z"
   Books:
     columns:
       - BookID: "book-001"
@@ -21,3 +43,13 @@ tables:
         Author: "F. Scott Fitzgerald"
         PublishedYear: 1925
         JSONData: '{"genre": "Fiction", "rating": 4.5}'
+      - BookID: "book-002"
+        Title: "To Kill a Mockingbird"
+        Author: "Harper Lee"
+        PublishedYear: 1960
+        JSONData: '{"genre": "Fiction", "rating": 4.8}'
+      - BookID: "book-003"
+        Title: "1984"
+        Author: "George Orwell"
+        PublishedYear: 1949
+        JSONData: '{"genre": "Dystopian", "rating": 4.6}'

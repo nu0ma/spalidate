@@ -36,21 +36,21 @@ func NewValidator(config *config.Config, client *spannerClient.Client) *Validato
 }
 
 func (v *Validator) Validate() error {
-    ctx := context.Background()
+	ctx := context.Background()
 
-    names := sortedTableNames(v.config.Tables)
-    var errs []string
-    for _, tableName := range names {
-        tableConfig := v.config.Tables[tableName]
-        if err := v.validateTable(ctx, tableName, tableConfig); err != nil {
-            errs = append(errs, fmt.Sprintf("validation failed for table %s: %v", tableName, err))
-        }
-    }
+	names := sortedTableNames(v.config.Tables)
+	var errs []string
+	for _, tableName := range names {
+		tableConfig := v.config.Tables[tableName]
+		if err := v.validateTable(ctx, tableName, tableConfig); err != nil {
+			errs = append(errs, fmt.Sprintf("validation failed for table %s: %v", tableName, err))
+		}
+	}
 
-    if len(errs) > 0 {
-        return errors.New(strings.Join(errs, "; "))
-    }
-    return nil
+	if len(errs) > 0 {
+		return errors.New(strings.Join(errs, "; "))
+	}
+	return nil
 }
 
 func (v *Validator) validateTable(ctx context.Context, tableName string, tableConfig config.TableConfig) error {
@@ -85,54 +85,70 @@ func (v *Validator) validateTable(ctx context.Context, tableName string, tableCo
 	}
 
 	if len(tableConfig.Columns) > 0 {
-		for _, expectedData := range tableConfig.Columns {
-			matched := false
-			var bestDiffs []colDiff
-			// Try to find a row that matches all columns; otherwise remember the closest diffs
-			for _, actualData := range rows {
-				if !sameKeySet(actualData, expectedData) {
-					continue
-				}
-				// Compare all columns and collect diffs
-				diffs := make([]colDiff, 0)
-				ok := true
-				for key, actualValue := range actualData {
-					expectedValue := expectedData[key]
-					if err := v.validateData(actualValue, expectedValue); err != nil {
-						ok = false
-						diffs = append(diffs, colDiff{
-							column:   key,
-							expected: expectedValue,
-							actual:   actualValue,
-						})
-					}
-				}
-				if ok {
-					matched = true
-					break
-				}
-				if len(bestDiffs) == 0 || len(diffs) < len(bestDiffs) {
-					bestDiffs = diffs
-				}
-			}
-			if !matched {
-				// Log pretty, multi-line report with emojis for readability
-				if len(bestDiffs) > 0 {
-					logging.L().Error(buildMismatchReport(tableName, bestDiffs))
-				} else {
-					// No row had the exact same key set; show key set differences to aid debugging
-					expKeys := sortedKeys(expectedData)
-					var exampleKeys []string
-					if len(rows) > 0 {
-						exampleKeys = sortedKeys(rows[0])
-					}
-					logging.L().Error(buildColumnSetMismatchReport(tableName, expKeys, exampleKeys))
-				}
-				return fmt.Errorf("no row strictly matched spec (all columns required)")
-			}
+		// デフォルトで行集合の完全一致を要求
+		if err := v.validateStrictRowset(tableName, rows, tableConfig.Columns); err != nil {
+			return err
 		}
 	}
 
+	return nil
+}
+
+func (v *Validator) validateStrictRowset(tableName string, actualRows []map[string]any, expectedRows []map[string]any) error {
+	if len(actualRows) != len(expectedRows) {
+		return fmt.Errorf("unexpected row count for table %s: expected %d, got %d", tableName, len(expectedRows), len(actualRows))
+	}
+	used := make([]bool, len(actualRows))
+
+	for ei, exp := range expectedRows {
+		found := false
+		var bestDiffs []colDiff
+		for ai, act := range actualRows {
+			if used[ai] {
+				continue
+			}
+			if !sameKeySet(act, exp) {
+				continue
+			}
+			diffs := make([]colDiff, 0)
+			ok := true
+			for key, actualValue := range act {
+				expectedValue := exp[key]
+				if err := v.validateData(actualValue, expectedValue); err != nil {
+					ok = false
+					diffs = append(diffs, colDiff{column: key, expected: expectedValue, actual: actualValue})
+				}
+			}
+			if ok {
+				used[ai] = true
+				found = true
+				break
+			}
+			if len(bestDiffs) == 0 || len(diffs) < len(bestDiffs) {
+				bestDiffs = diffs
+			}
+		}
+		if !found {
+			if len(bestDiffs) > 0 {
+				logging.L().Error(buildMismatchReport(tableName, bestDiffs))
+			} else {
+				expKeys := sortedKeys(exp)
+				var exampleKeys []string
+				if len(actualRows) > 0 {
+					exampleKeys = sortedKeys(actualRows[0])
+				}
+				logging.L().Error(buildColumnSetMismatchReport(tableName, expKeys, exampleKeys))
+			}
+			return fmt.Errorf("expected row %d not found in table %s", ei+1, tableName)
+		}
+	}
+
+	// any unmatched actual row?
+	for _, u := range used {
+		if !u {
+			return fmt.Errorf("unexpected rows present in table %s", tableName)
+		}
+	}
 	return nil
 }
 
@@ -421,18 +437,18 @@ func sortedKeys(m map[string]any) []string {
 }
 
 func sortedTableNames(m map[string]config.TableConfig) []string {
-    ks := make([]string, 0, len(m))
-    for k := range m {
-        ks = append(ks, k)
-    }
-    for i := 1; i < len(ks); i++ {
-        j := i
-        for j > 0 && ks[j-1] > ks[j] {
-            ks[j-1], ks[j] = ks[j], ks[j-1]
-            j--
-        }
-    }
-    return ks
+	ks := make([]string, 0, len(m))
+	for k := range m {
+		ks = append(ks, k)
+	}
+	for i := 1; i < len(ks); i++ {
+		j := i
+		for j > 0 && ks[j-1] > ks[j] {
+			ks[j-1], ks[j] = ks[j], ks[j-1]
+			j--
+		}
+	}
+	return ks
 }
 
 func buildMismatchReport(table string, diffs []colDiff) string {

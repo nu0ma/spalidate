@@ -250,7 +250,7 @@ func TestCLIValidation(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		output, err := runSpalidateWithFile("test_multi_columns_fail.yaml", true, clients.ProjectID, clients.InstanceID, clients.DatabaseID)
+		output, err := runSpalidateWithFile("test_fail.yaml", true, clients.ProjectID, clients.InstanceID, clients.DatabaseID)
 		if err == nil {
 			t.Fatalf("Validation should fail but succeeded. Output: %s", output)
 		}
