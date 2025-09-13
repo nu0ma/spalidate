@@ -1,0 +1,25 @@
+tables:
+  Users:
+    count: 3
+    columns:
+      - UserID: "user-001"
+        Name: "Alice Johnson"
+        Email: "alice@example.com"
+        Status: 1
+  Products:
+    count: 3
+    columns:
+      - ProductID: "prod-001"
+        Name: "Laptop Computer"
+        Price: 150000
+        IsActive: true
+        CategoryID: "cat-electronics"
+        CreatedAt: "2024-01-01T00:00:00Z"
+  Books:
+    count: 3
+    columns:
+      - BookID: "book-001"
+        Title: "The Great Gatsby"
+        Author: "F. Scott Fitzgerald"
+        PublishedYear: 1925
+        JSONData: '{"genre": "Fiction", "rating": 4.5}'
