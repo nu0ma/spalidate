@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	chlog "github.com/charmbracelet/log"
-	"github.com/muesli/termenv"
 )
 
 var defaultLogger *chlog.Logger
@@ -32,15 +31,6 @@ func Init(level, format string, verbose bool, colorMode string) (func(), error) 
 	}
 	if strings.EqualFold(format, "json") {
 		l.SetFormatter(chlog.JSONFormatter)
-	}
-	// カラー強制/禁止（TextFormatter時のみ意味がある）
-	if !strings.EqualFold(format, "json") {
-		switch strings.ToLower(colorMode) {
-		case "always":
-			l.SetColorProfile(termenv.TrueColor)
-		case "never":
-			l.SetColorProfile(termenv.Ascii)
-		}
 	}
 
 	prevWriter := stdlog.Writer()

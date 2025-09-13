@@ -71,8 +71,6 @@ func (v *Validator) validateTable(ctx context.Context, tableName string, tableCo
 		return fmt.Errorf("query execution failed: %w", err)
 	}
 
-	// When 'columns' is set, verify that for each expected spec
-	// at least one row strictly matches with all columns.
 	if len(tableConfig.Columns) > 0 {
 		for _, expectedData := range tableConfig.Columns {
 			matched := false
@@ -105,22 +103,7 @@ func (v *Validator) validateTable(ctx context.Context, tableName string, tableCo
 }
 
 func (v *Validator) validateData(record any, expectedData any) error {
-	// Handle nil/NULL values
-	if isSpannerNull(record) {
-		if expectedData == nil {
-			return nil
-		}
-		return fmt.Errorf("expected non-null, got NULL (expected=%v)", expectedData)
-	}
-	if record == nil {
-		if expectedData == nil {
-			return nil
-		}
-		return fmt.Errorf("expected %v, got <nil>", expectedData)
-	}
-
 	switch r := record.(type) {
-	// DATE
 	case spanner.NullDate:
 		if !r.Valid {
 			if expectedData == nil {
@@ -161,8 +144,6 @@ func (v *Validator) validateData(record any, expectedData any) error {
 		return compareNumbers(r.Float64, expectedData)
 	case float64:
 		return compareNumbers(r, expectedData)
-
-		// JSON (Spanner native JSON type)
 	case spanner.NullJSON:
 		if !r.Valid {
 			if expectedData == nil {
@@ -211,23 +192,6 @@ func (v *Validator) validateData(record any, expectedData any) error {
 }
 
 // --- Helpers ---
-
-func isSpannerNull(v any) bool {
-	switch x := v.(type) {
-	case spanner.NullString:
-		return !x.Valid
-	case spanner.NullInt64:
-		return !x.Valid
-	case spanner.NullFloat64:
-		return !x.Valid
-	case spanner.NullBool:
-		return !x.Valid
-	case spanner.NullTime:
-		return !x.Valid
-	default:
-		return false
-	}
-}
 
 func typeMismatchError(expectedKind string, got any) error {
 	return fmt.Errorf("type mismatch: expected %s, got %T (value=%v)", expectedKind, got, got)
