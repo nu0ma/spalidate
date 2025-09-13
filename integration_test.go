@@ -11,14 +11,12 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"github.com/apstndb/spanemuboost"
+	tcspanner "github.com/testcontainers/testcontainers-go/modules/gcloud/spanner"
 )
 
 var (
-	testProject   = "test-project"
-	testInstance  = "test-instance"
-	testDatabase  = "test-database"
-	emulatorHost  string
-	spannerClient *spanner.Client
+	emulatorHost string
+	emulator     *tcspanner.Container
 )
 
 var schema = `
@@ -51,18 +49,14 @@ CREATE TABLE Books (
 func TestMain(m *testing.M) {
 	ctx := context.Background()
 
-	ddls := parseSchemaStatements(string(schema))
-
-	emulator, clients, teardown, err := spanemuboost.NewEmulatorWithClients(ctx,
-		spanemuboost.WithProjectID(testProject),
-		spanemuboost.WithInstanceID(testInstance),
-		spanemuboost.WithDatabaseID(testDatabase),
-		spanemuboost.WithSetupDDLs(ddls),
+	var teardown func()
+	var err error
+	emulator, teardown, err = spanemuboost.NewEmulator(ctx,
+		spanemuboost.EnableInstanceAutoConfigOnly(),
 	)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to create emulator: %v", err))
 	}
-	defer teardown()
 
 	// Get emulator host
 	host, err := emulator.Host(ctx)
@@ -78,16 +72,13 @@ func TestMain(m *testing.M) {
 		panic(fmt.Sprintf("Failed to set SPANNER_EMULATOR_HOST: %v", err))
 	}
 
-	// Use the Spanner client from emulator
-	spannerClient = clients.Client
-
 	// Run tests
 	code := m.Run()
+	teardown()
 	os.Exit(code)
 }
 
 func parseSchemaStatements(schema string) []string {
-	// Remove comments and split by semicolon
 	lines := strings.Split(schema, "\n")
 	var cleanLines []string
 	for _, line := range lines {
@@ -98,7 +89,6 @@ func parseSchemaStatements(schema string) []string {
 	}
 	cleanContent := strings.Join(cleanLines, "\n")
 
-	// Split by semicolon to get statements
 	statements := strings.Split(cleanContent, ";")
 	var result []string
 	for _, stmt := range statements {
@@ -111,13 +101,9 @@ func parseSchemaStatements(schema string) []string {
 	return result
 }
 
-// Helper functions
-
-// === Test data (DML) centralized here ===
 var fixedTime = time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
-func runSpalidateWithFile(filePath string, verbose bool) (string, error) {
-	// Build the spalidate binary first
+func runSpalidateWithFile(filePath string, verbose bool, project, instance, database string) (string, error) {
 	buildCmd := exec.Command("go", "build", "-o", "spalidate", "main.go")
 	if err := buildCmd.Run(); err != nil {
 		return "", fmt.Errorf("failed to build spalidate: %w", err)
@@ -125,9 +111,9 @@ func runSpalidateWithFile(filePath string, verbose bool) (string, error) {
 
 	// Run spalidate with the file path
 	args := []string{
-		"--project", testProject,
-		"--instance", testInstance,
-		"--database", testDatabase,
+		"--project", project,
+		"--instance", instance,
+		"--database", database,
 		filePath,
 	}
 	if verbose {
@@ -141,8 +127,8 @@ func runSpalidateWithFile(filePath string, verbose bool) (string, error) {
 	return string(output), err
 }
 
-func initializeTestData(ctx context.Context) error {
-	if err := insertTestData(ctx, []*spanner.Mutation{
+func initializeTestData(ctx context.Context, client *spanner.Client) error {
+	if err := insertTestData(ctx, client, []*spanner.Mutation{
 		spanner.Insert("Books",
 			[]string{"BookID", "Title", "Author", "PublishedYear", "JSONData"},
 			[]any{"book-001", "The Great Gatsby", "F. Scott Fitzgerald", int64(1925), `{"genre": "Fiction", "rating": 4.5}`}),
@@ -155,7 +141,7 @@ func initializeTestData(ctx context.Context) error {
 	}); err != nil {
 		return fmt.Errorf("failed to insert test users: %w", err)
 	}
-	if err := insertTestData(ctx, []*spanner.Mutation{
+	if err := insertTestData(ctx, client, []*spanner.Mutation{
 		spanner.Insert("Products",
 			[]string{"ProductID", "Name", "Price", "IsActive", "CategoryID", "CreatedAt"},
 			[]any{"prod-001", "Laptop Computer", int64(150000), true, "cat-electronics", fixedTime}),
@@ -168,7 +154,7 @@ func initializeTestData(ctx context.Context) error {
 	}); err != nil {
 		return fmt.Errorf("failed to insert test products: %w", err)
 	}
-	if err := insertTestData(ctx, []*spanner.Mutation{
+	if err := insertTestData(ctx, client, []*spanner.Mutation{
 		spanner.Insert("Users",
 			[]string{"UserID", "Name", "Email", "Status", "CreatedAt"},
 			[]any{"user-001", "Alice Johnson", "alice@example.com", int64(1), fixedTime}),
@@ -184,40 +170,8 @@ func initializeTestData(ctx context.Context) error {
 	return nil
 }
 
-func cleanupTestData(ctx context.Context) error {
-	stmt := spanner.Statement{SQL: `
-        SELECT t.table_name
-        FROM information_schema.tables AS t
-        WHERE t.table_catalog = '' AND t.table_schema = ''
-    `}
-
-	iter := spannerClient.Single().Query(ctx, stmt)
-	defer iter.Stop()
-
-	var tableNames []string
-	err := iter.Do(func(row *spanner.Row) error {
-		var name string
-		if err := row.Columns(&name); err != nil {
-			return err
-		}
-		tableNames = append(tableNames, name)
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("failed to list tables: %w", err)
-	}
-
-	for _, tbl := range tableNames {
-		stmtDel := spanner.Statement{SQL: fmt.Sprintf("DELETE FROM %s WHERE TRUE", tbl)}
-		if _, err := spannerClient.PartitionedUpdate(ctx, stmtDel); err != nil {
-			return fmt.Errorf("failed to cleanup table %s: %w", tbl, err)
-		}
-	}
-	return nil
-}
-
-func insertTestData(ctx context.Context, mutations []*spanner.Mutation) error {
-	_, err := spannerClient.Apply(ctx, mutations)
+func insertTestData(ctx context.Context, client *spanner.Client, mutations []*spanner.Mutation) error {
+	_, err := client.Apply(ctx, mutations)
 	return err
 }
 
@@ -227,17 +181,23 @@ func TestCLIValidation(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("TestWithExistingValidationFile", func(t *testing.T) {
-		// Clean up first
-		if err := cleanupTestData(ctx); err != nil {
+		ddls := parseSchemaStatements(string(schema))
+		clients, clientsTeardown, err := spanemuboost.NewClients(ctx, emulator,
+			spanemuboost.EnableDatabaseAutoConfigOnly(),
+			spanemuboost.WithRandomDatabaseID(),
+			spanemuboost.WithSetupDDLs(ddls),
+		)
+		if err != nil {
 			t.Fatal(err)
 		}
+		defer clientsTeardown()
 
-		if err := initializeTestData(ctx); err != nil {
+		if err := initializeTestData(ctx, clients.Client); err != nil {
 			t.Fatal(err)
 		}
 
 		// Run validation with test_validation.yaml
-		output, err := runSpalidateWithFile("test_validation.yaml", true)
+		output, err := runSpalidateWithFile("test_validation.yaml", true, clients.ProjectID, clients.InstanceID, clients.DatabaseID)
 		if err != nil {
 			t.Fatalf("Validation failed: %v\nOutput: %s", err, output)
 		}
@@ -249,15 +209,22 @@ func TestCLIValidation(t *testing.T) {
 	})
 
 	t.Run("TestMultipleColumnsMatching_Success", func(t *testing.T) {
-		if err := cleanupTestData(ctx); err != nil {
+		ddls := parseSchemaStatements(string(schema))
+		clients, clientsTeardown, err := spanemuboost.NewClients(ctx, emulator,
+			spanemuboost.EnableDatabaseAutoConfigOnly(),
+			spanemuboost.WithRandomDatabaseID(),
+			spanemuboost.WithSetupDDLs(ddls),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer clientsTeardown()
+
+		if err := initializeTestData(ctx, clients.Client); err != nil {
 			t.Fatal(err)
 		}
 
-		if err := initializeTestData(ctx); err != nil {
-			t.Fatal(err)
-		}
-
-		output, err := runSpalidateWithFile("test_multi_columns.yaml", true)
+		output, err := runSpalidateWithFile("test_multi_columns.yaml", true, clients.ProjectID, clients.InstanceID, clients.DatabaseID)
 		if err != nil {
 			t.Fatalf("Validation should succeed, got error: %v\nOutput: %s", err, output)
 		}
@@ -267,14 +234,22 @@ func TestCLIValidation(t *testing.T) {
 	})
 
 	t.Run("TestMultipleColumnsMatching_Failure", func(t *testing.T) {
-		if err := cleanupTestData(ctx); err != nil {
+		ddls := parseSchemaStatements(string(schema))
+		clients, clientsTeardown, err := spanemuboost.NewClients(ctx, emulator,
+			spanemuboost.EnableDatabaseAutoConfigOnly(),
+			spanemuboost.WithRandomDatabaseID(),
+			spanemuboost.WithSetupDDLs(ddls),
+		)
+		if err != nil {
 			t.Fatal(err)
 		}
-		if err := initializeTestData(ctx); err != nil {
+		defer clientsTeardown()
+
+		if err := initializeTestData(ctx, clients.Client); err != nil {
 			t.Fatal(err)
 		}
 
-		output, err := runSpalidateWithFile("test_multi_columns_fail.yaml", true)
+		output, err := runSpalidateWithFile("test_multi_columns_fail.yaml", true, clients.ProjectID, clients.InstanceID, clients.DatabaseID)
 		if err == nil {
 			t.Fatalf("Validation should fail but succeeded. Output: %s", output)
 		}
