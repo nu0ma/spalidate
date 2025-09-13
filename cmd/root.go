@@ -3,23 +3,27 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/nu0ma/spalidate/internal/config"
+	"github.com/nu0ma/spalidate/internal/logging"
 	"github.com/nu0ma/spalidate/internal/spanner"
 	"github.com/nu0ma/spalidate/internal/validator"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 const version = "v1.0.0"
 
 var (
-	project  string
-	instance string
-	database string
-	port     int
-	verbose  bool
+	project   string
+	instance  string
+	database  string
+	port      int
+	verbose   bool
+	logLevel  string
+	logFormat string
+	cleanup   func()
 )
 
 var rootCmd = &cobra.Command{
@@ -30,7 +34,21 @@ against YAML configuration files. It connects to Spanner emulator instances
 and performs comprehensive data validation with flexible type comparison.`,
 	Args:    cobra.ExactArgs(1),
 	Version: version,
-	RunE:    run,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// zap 初期化
+		c, err := logging.Init(logLevel, logFormat, verbose)
+		if err != nil {
+			return err
+		}
+		cleanup = c
+		zap.L().Debug("logger initialized",
+			zap.String("level", logLevel),
+			zap.String("format", logFormat),
+			zap.Bool("verbose", verbose),
+		)
+		return nil
+	},
+	RunE: run,
 }
 
 func init() {
@@ -38,7 +56,9 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&instance, "instance", "i", "", "Spanner instance ID (required)")
 	rootCmd.PersistentFlags().StringVarP(&database, "database", "d", "", "Spanner database ID (required)")
 	rootCmd.PersistentFlags().IntVar(&port, "port", 9010, "Spanner emulator port")
-	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging")
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging (sets level=debug)")
+	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "Log level: debug, info, warn, error")
+	rootCmd.PersistentFlags().StringVar(&logFormat, "log-format", "console", "Log format: console or json")
 
 	rootCmd.MarkPersistentFlagRequired("project")
 	rootCmd.MarkPersistentFlagRequired("instance")
@@ -54,20 +74,25 @@ func Execute() {
 func run(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 	configPath := args[0]
-
-	if verbose {
-		log.SetFlags(log.LstdFlags | log.Lshortfile)
-		log.Println("Starting spalidate validation")
+	if cleanup != nil {
+		defer cleanup()
 	}
+	zap.L().Info("Starting spalidate validation",
+		zap.String("config", configPath),
+		zap.String("project", project),
+		zap.String("instance", instance),
+		zap.String("database", database),
+		zap.Int("port", port),
+	)
 
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	if verbose {
-		log.Printf("Loaded config with %d tables", len(cfg.Tables))
-	}
+	zap.L().Debug("Loaded config",
+		zap.Int("tables", len(cfg.Tables)),
+	)
 
 	spannerClient, err := spanner.NewClient(ctx, project, instance, database)
 	if err != nil {
@@ -76,14 +101,9 @@ func run(cmd *cobra.Command, args []string) error {
 
 	v := validator.NewValidator(cfg, spannerClient)
 	if err := v.Validate(); err != nil {
-		return fmt.Errorf("validation failed: %w", err)
+		return fmt.Errorf("🚨validation failed: %w", err)
 	}
-
-	if verbose {
-		log.Println("Validation completed successfully")
-	}
-
-	fmt.Println("Validation passed for all tables")
+	zap.L().Info("Validation completed successfully")
 
 	return nil
 }

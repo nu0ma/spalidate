@@ -23,7 +23,9 @@ spalidate --project=test-project --instance=test-instance --database=test-databa
 - `--database`: Spanner database ID (required)
 - `--port`: Spanner emulator port (default: 9010)
 - `--version`: Show version information
-- `--verbose`: Enable verbose logging
+- `--verbose`: Enable verbose logging (equivalent to `--log-level=debug`)
+- `--log-level`: Log level (`debug`, `info`, `warn`, `error`) default: `info`
+- `--log-format`: Log format (`console`, `json`) default: `console`
 - `--help`: Show help information
 
 ### Positional Arguments
@@ -73,6 +75,20 @@ spalidate --project=test-project --instance=test-instance --database=test-databa
 ```bash
 spalidate --project=test-project --instance=test-instance --database=test-database --verbose ./validation.yaml
 ```
+
+### JSON logs
+```bash
+spalidate \
+  --project=test-project --instance=test-instance --database=test-database \
+  --log-level=info --log-format=json ./validation.yaml
+```
+
+## Logging
+
+Spalidate は zap を用いてログを一元化しています。
+
+- `--log-level` と `--log-format` で出力を制御できます（`--verbose` は `--log-level=debug` のショートカット）。
+- 標準ライブラリの `log` 出力も zap に取り込まれるため、外部ライブラリのログも一箇所に集約されます。
 
 ### Custom emulator port
 ```bash
