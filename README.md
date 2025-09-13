@@ -55,7 +55,7 @@ On success: `Validation passed for all tables`
 - `-p, --project` (required): Project ID
 - `-i, --instance` (required): Instance ID
 - `-d, --database` (required): Database ID
-- `--port` (default 9010): Emulator port
+- `--port` (default 9010): Emulator port (used when SPANNER_EMULATOR_HOST is not set)
 - `--version`: Show version
 
 

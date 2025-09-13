@@ -89,7 +89,12 @@ func run(cmd *cobra.Command, args []string) error {
 
 	logging.L().Debug("Loaded config", "tables", len(cfg.Tables))
 
-	spannerClient, err := spanner.NewClient(ctx, project, instance, database)
+	opts := spanner.Options{}
+	if port != 0 && os.Getenv("SPANNER_EMULATOR_HOST") == "" {
+		opts.EmulatorHost = fmt.Sprintf("localhost:%d", port)
+	}
+	
+	spannerClient, err := spanner.NewClient(ctx, project, instance, database, opts)
 	if err != nil {
 		return fmt.Errorf("creating spanner client: %w", err)
 	}
