@@ -124,39 +124,39 @@ func initializeTestData(ctx context.Context) error {
 	if err := insertTestData(ctx, []*spanner.Mutation{
 		spanner.Insert("Books",
 			[]string{"BookID", "Title", "Author", "PublishedYear", "JSONData"},
-			[]interface{}{"book-001", "The Great Gatsby", "F. Scott Fitzgerald", int64(1925), `{"genre": "Fiction", "rating": 4.5}`}),
+			[]any{"book-001", "The Great Gatsby", "F. Scott Fitzgerald", int64(1925), `{"genre": "Fiction", "rating": 4.5}`}),
 		spanner.Insert("Books",
 			[]string{"BookID", "Title", "Author", "PublishedYear", "JSONData"},
-			[]interface{}{"book-002", "To Kill a Mockingbird", "Harper Lee", int64(1960), `{"genre": "Fiction", "rating": 4.8}`}),
+			[]any{"book-002", "To Kill a Mockingbird", "Harper Lee", int64(1960), `{"genre": "Fiction", "rating": 4.8}`}),
 		spanner.Insert("Books",
 			[]string{"BookID", "Title", "Author", "PublishedYear", "JSONData"},
-			[]interface{}{"book-003", "1984", "George Orwell", int64(1949), `{"genre": "Dystopian", "rating": 4.6}`}),
+			[]any{"book-003", "1984", "George Orwell", int64(1949), `{"genre": "Dystopian", "rating": 4.6}`}),
 	}); err != nil {
 		return fmt.Errorf("failed to insert test users: %w", err)
 	}
 	if err := insertTestData(ctx, []*spanner.Mutation{
 		spanner.Insert("Products",
 			[]string{"ProductID", "Name", "Price", "IsActive", "CategoryID", "CreatedAt"},
-			[]interface{}{"prod-001", "Laptop Computer", int64(150000), true, "cat-electronics", fixedTime}),
+			[]any{"prod-001", "Laptop Computer", int64(150000), true, "cat-electronics", fixedTime}),
 		spanner.Insert("Products",
 			[]string{"ProductID", "Name", "Price", "IsActive", "CategoryID", "CreatedAt"},
-			[]interface{}{"prod-002", "Wireless Mouse", int64(3000), true, "cat-electronics", fixedTime}),
+			[]any{"prod-002", "Wireless Mouse", int64(3000), true, "cat-electronics", fixedTime}),
 		spanner.Insert("Products",
 			[]string{"ProductID", "Name", "Price", "IsActive", "CategoryID", "CreatedAt"},
-			[]interface{}{"prod-003", "Coffee Mug", int64(1200), false, "cat-kitchen", fixedTime}),
+			[]any{"prod-003", "Coffee Mug", int64(1200), false, "cat-kitchen", fixedTime}),
 	}); err != nil {
 		return fmt.Errorf("failed to insert test products: %w", err)
 	}
 	if err := insertTestData(ctx, []*spanner.Mutation{
 		spanner.Insert("Users",
 			[]string{"UserID", "Name", "Email", "Status", "CreatedAt"},
-			[]interface{}{"user-001", "Alice Johnson", "alice@example.com", int64(1), fixedTime}),
+			[]any{"user-001", "Alice Johnson", "alice@example.com", int64(1), fixedTime}),
 		spanner.Insert("Users",
 			[]string{"UserID", "Name", "Email", "Status", "CreatedAt"},
-			[]interface{}{"user-002", "Bob Smith", "bob@example.com", int64(2), fixedTime}),
+			[]any{"user-002", "Bob Smith", "bob@example.com", int64(2), fixedTime}),
 		spanner.Insert("Users",
 			[]string{"UserID", "Name", "Email", "Status", "CreatedAt"},
-			[]interface{}{"user-003", "Charlie Brown", "charlie@example.com", int64(1), fixedTime}),
+			[]any{"user-003", "Charlie Brown", "charlie@example.com", int64(1), fixedTime}),
 	}); err != nil {
 		return fmt.Errorf("failed to insert test books: %w", err)
 	}

@@ -80,7 +80,7 @@ The validator implements sophisticated type comparison logic:
 - **`big.Rat`** (NUMERIC/DECIMAL): Compares with optional floating-point tolerance
 - **`time.Time`** (TIMESTAMP): Supports multiple time formats with optional truncation
 - **`[]byte`** (BYTES): Handles base64 encoding/decoding automatically
-- **`map[string]interface{}`** (JSON): Deep comparison with configurable key order independence
+- **`map[string]any`** (JSON): Deep comparison with configurable key order independence
 
 #### Numeric Type Flexibility
 - Handles int ↔ int64 ↔ float64 conversions common in Spanner
