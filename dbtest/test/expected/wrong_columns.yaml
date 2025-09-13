@@ -1,9 +1,0 @@
-tables:
-  Users:
-    count: 3
-    order_by: "UserID"
-    rows:
-      - UserID: "user-001"
-        Name: "Wrong Name"  # Should be "Alice Johnson"
-        Email: "wrong@example.com"  # Should be "alice@example.com"
-        Status: 2  # Should be 1
