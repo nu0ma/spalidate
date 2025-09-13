@@ -44,8 +44,8 @@ func (v *Validator) validateTable(ctx context.Context, tableName string, tableCo
 	iter := v.spannerClient.Query(ctx, query)
 	defer iter.Stop()
 
-    var rows []map[string]any
-    // Read column data
+	var rows []map[string]any
+	// Read column data
 	err := iter.Do(func(row *spanner.Row) error {
 		columnNames := row.ColumnNames()
 		rowData := make(map[string]any)
@@ -76,22 +76,22 @@ func (v *Validator) validateTable(ctx context.Context, tableName string, tableCo
 		return fmt.Errorf("query execution failed: %w", err)
 	}
 
-    // Validate row count
+	// Validate row count
 	if len(rows) != tableConfig.Count {
 		return fmt.Errorf("row count mismatch: expected %d, got %d", tableConfig.Count, len(rows))
 	}
 
-    // When 'columns' is set, verify that for each expected spec
-    // at least one row strictly matches with all columns.
+	// When 'columns' is set, verify that for each expected spec
+	// at least one row strictly matches with all columns.
 	if len(tableConfig.Columns) > 0 && len(rows) > 0 {
 		for _, expectedData := range tableConfig.Columns {
 			matched := false
 			for _, actualData := range rows {
-                // Key sets must match exactly
+				// Key sets must match exactly
 				if !sameKeySet(actualData, expectedData) {
 					continue
 				}
-                // Compare all columns
+				// Compare all columns
 				ok := true
 				for key, actualValue := range actualData {
 					expectedValue := expectedData[key]
@@ -115,7 +115,7 @@ func (v *Validator) validateTable(ctx context.Context, tableName string, tableCo
 }
 
 func (v *Validator) validateData(record any, expectedData any) error {
-    // Handle nil/NULL values
+	// Handle nil/NULL values
 	if isSpannerNull(record) {
 		if expectedData == nil {
 			return nil
@@ -161,7 +161,7 @@ func (v *Validator) validateData(record any, expectedData any) error {
 	case float64:
 		return compareNumbers(r, expectedData)
 
-    // JSON (Spanner native JSON type)
+		// JSON (Spanner native JSON type)
 	case spanner.NullJSON:
 		if !r.Valid {
 			if expectedData == nil {
@@ -238,8 +238,8 @@ func valueMismatchError(actual, expected any) error {
 
 func compareStrings(actual string, expected any) error {
 	switch ev := expected.(type) {
-    case string:
-        // If expected looks like JSON, compare as JSON
+	case string:
+		// If expected looks like JSON, compare as JSON
 		if looksLikeJSON(ev) {
 			var a any
 			if err := json.Unmarshal([]byte(actual), &a); err != nil {
@@ -249,8 +249,8 @@ func compareStrings(actual string, expected any) error {
 			if err := json.Unmarshal([]byte(ev), &e); err != nil {
 				return fmt.Errorf("expected is not valid JSON: %w", err)
 			}
-            if !deepEqualJSON(a, e) {
-                // Keep diff representation concise
+			if !deepEqualJSON(a, e) {
+				// Keep diff representation concise
 				aa, _ := json.Marshal(a)
 				ee, _ := json.Marshal(e)
 				return valueMismatchError(string(aa), string(ee))
@@ -261,10 +261,10 @@ func compareStrings(actual string, expected any) error {
 			return valueMismatchError(actual, ev)
 		}
 		return nil
-    default:
-        // Avoid stringifying when YAML gives numbers/bools; report type mismatch
-        return typeMismatchError("string", expected)
-    }
+	default:
+		// Avoid stringifying when YAML gives numbers/bools; report type mismatch
+		return typeMismatchError("string", expected)
+	}
 }
 
 // JSON comparison (Spanner JSON or generic)
@@ -272,18 +272,18 @@ func compareJSON(actual any, expected any) error {
 	var a any
 	var e any
 
-    // Normalize actual side
+	// Normalize actual side
 	switch v := actual.(type) {
 	case string:
 		if err := json.Unmarshal([]byte(v), &a); err != nil {
 			return fmt.Errorf("actual is not valid JSON: %w", err)
 		}
-    default:
-        // Spanner NullJSON.Value is assumed to be map/slice already
-        a = v
-    }
+	default:
+		// Spanner NullJSON.Value is assumed to be map/slice already
+		a = v
+	}
 
-    // Normalize expected side
+	// Normalize expected side
 	switch v := expected.(type) {
 	case string:
 		if !looksLikeJSON(v) {
@@ -292,10 +292,10 @@ func compareJSON(actual any, expected any) error {
 		if err := json.Unmarshal([]byte(v), &e); err != nil {
 			return fmt.Errorf("expected is not valid JSON: %w", err)
 		}
-    default:
-        // Accept map[string]any / []any as-is
-        e = v
-    }
+	default:
+		// Accept map[string]any / []any as-is
+		e = v
+	}
 
 	if !deepEqualJSON(a, e) {
 		aa, _ := json.Marshal(a)
@@ -312,8 +312,8 @@ func looksLikeJSON(s string) bool {
 }
 
 func deepEqualJSON(a, b any) bool {
-    // JSON numbers become float64; DeepEqual is sufficient.
-    return reflect.DeepEqual(a, b)
+	// JSON numbers become float64; DeepEqual is sufficient.
+	return reflect.DeepEqual(a, b)
 }
 
 // sameKeySet checks whether two maps have exactly the same key set.
@@ -335,11 +335,11 @@ func sameKeySet(a, b map[string]any) bool {
 }
 
 func compareNumbers(actual any, expected any) error {
-    // 'actual' is expected to be int64 or float64
+	// 'actual' is expected to be int64 or float64
 	avInt, aIsInt := toInt64(actual)
 	avFloat, aIsFloat := toFloat64(actual)
 
-    // 'expected' may be int, int64, or float64
+	// 'expected' may be int, int64, or float64
 	evInt, eIsInt := toInt64(expected)
 	evFloat, eIsFloat := toFloat64(expected)
 
@@ -349,8 +349,8 @@ func compareNumbers(actual any, expected any) error {
 			return valueMismatchError(avInt, evInt)
 		}
 		return nil
-    case aIsFloat && eIsFloat:
-        // No epsilon for floats (simplified). Add tolerance if needed.
+	case aIsFloat && eIsFloat:
+		// No epsilon for floats (simplified). Add tolerance if needed.
 		if avFloat != evFloat {
 			return valueMismatchError(avFloat, evFloat)
 		}
@@ -372,9 +372,9 @@ func compareNumbers(actual any, expected any) error {
 
 func compareTimestamps(actual time.Time, expected any) error {
 	switch ev := expected.(type) {
-    case string:
-        // Prefer RFC3339 formats
-        t, err := parseTimestamp(ev)
+	case string:
+		// Prefer RFC3339 formats
+		t, err := parseTimestamp(ev)
 		if err != nil {
 			return fmt.Errorf("invalid timestamp format for expected value: %w", err)
 		}
@@ -393,7 +393,7 @@ func compareTimestamps(actual time.Time, expected any) error {
 }
 
 func parseTimestamp(s string) (time.Time, error) {
-    // Accept multiple formats in order
+	// Accept multiple formats in order
 	fmts := []string{
 		time.RFC3339Nano,
 		time.RFC3339,
@@ -461,7 +461,7 @@ func toFloat64(v any) (float64, bool) {
 // decodeGenericValue decodes a Spanner GenericColumnValue into supported concrete types.
 // It returns types that validateData can consume (spanner.Null* or primitives).
 func decodeGenericValue(gcv *spanner.GenericColumnValue) (any, error) {
-        // JSON type
+	// JSON type
 	{
 		var v spanner.NullJSON
 		if err := gcv.Decode(&v); err == nil {
