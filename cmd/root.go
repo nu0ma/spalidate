@@ -15,15 +15,12 @@ import (
 const version = "v1.0.0"
 
 var (
-	project   string
-	instance  string
-	database  string
-	port      int
-	verbose   bool
-	logLevel  string
-	logFormat string
-	cleanup   func()
-	colorMode string
+	project  string
+	instance string
+	database string
+	port     int
+	verbose  bool
+	cleanup  func()
 )
 
 var rootCmd = &cobra.Command{
@@ -37,10 +34,7 @@ and performs comprehensive data validation with flexible type comparison.`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		if env := os.Getenv("SPALIDATE_COLOR"); env != "" && colorMode == "auto" {
-			colorMode = env
-		}
-		c, err := logging.Init(logLevel, logFormat, verbose, colorMode)
+		c, err := logging.Init(verbose)
 		if err != nil {
 			return err
 		}
@@ -56,9 +50,6 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&database, "database", "d", "", "Spanner database ID (required)")
 	rootCmd.PersistentFlags().IntVar(&port, "port", 9010, "Spanner emulator port")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging (sets level=debug)")
-	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "Log level: debug, info, warn, error")
-	rootCmd.PersistentFlags().StringVar(&logFormat, "log-format", "console", "Log format: console or json")
-	rootCmd.PersistentFlags().StringVar(&colorMode, "color", "auto", "Color: auto, always, never")
 
 	rootCmd.MarkPersistentFlagRequired("project")
 	rootCmd.MarkPersistentFlagRequired("instance")

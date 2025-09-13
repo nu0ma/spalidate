@@ -3,34 +3,16 @@ package logging
 import (
 	stdlog "log"
 	"os"
-	"strings"
 
 	chlog "github.com/charmbracelet/log"
 )
 
-var defaultLogger *chlog.Logger
+var logger *chlog.Logger
 
-// colorMode: "auto" | "always" | "never"
-func Init(level, format string, verbose bool, colorMode string) (func(), error) {
+func Init(verbose bool) (func(), error) {
 	l := chlog.NewWithOptions(os.Stderr, chlog.Options{ReportTimestamp: true})
-
-	switch {
-	case verbose:
+	if verbose {
 		l.SetLevel(chlog.DebugLevel)
-	default:
-		switch strings.ToLower(level) {
-		case "debug":
-			l.SetLevel(chlog.DebugLevel)
-		case "warn", "warning":
-			l.SetLevel(chlog.WarnLevel)
-		case "error":
-			l.SetLevel(chlog.ErrorLevel)
-		default:
-			l.SetLevel(chlog.InfoLevel)
-		}
-	}
-	if strings.EqualFold(format, "json") {
-		l.SetFormatter(chlog.JSONFormatter)
 	}
 
 	prevWriter := stdlog.Writer()
@@ -38,9 +20,8 @@ func Init(level, format string, verbose bool, colorMode string) (func(), error) 
 	prevPrefix := stdlog.Prefix()
 	stdlog.SetFlags(0)
 	stdlog.SetPrefix("")
-	stdlog.SetOutput(&stdLogAdapter{L: l})
 
-	defaultLogger = l
+	logger = l
 
 	cleanup := func() {
 		stdlog.SetOutput(prevWriter)
@@ -51,18 +32,8 @@ func Init(level, format string, verbose bool, colorMode string) (func(), error) 
 }
 
 func L() *chlog.Logger {
-	if defaultLogger == nil {
-		defaultLogger = chlog.New(os.Stderr)
+	if logger == nil {
+		logger = chlog.New(os.Stderr)
 	}
-	return defaultLogger
-}
-
-type stdLogAdapter struct{ L *chlog.Logger }
-
-func (w *stdLogAdapter) Write(p []byte) (int, error) {
-	msg := strings.TrimRight(string(p), "\r\n")
-	if msg != "" {
-		w.L.Info(msg)
-	}
-	return len(p), nil
+	return logger
 }

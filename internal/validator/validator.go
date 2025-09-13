@@ -12,6 +12,7 @@ import (
 	"cloud.google.com/go/civil"
 	"cloud.google.com/go/spanner"
 	"github.com/nu0ma/spalidate/internal/config"
+	"github.com/nu0ma/spalidate/internal/logging"
 	spannerClient "github.com/nu0ma/spalidate/internal/spanner"
 	"google.golang.org/api/iterator"
 )
@@ -19,6 +20,12 @@ import (
 type Validator struct {
 	config        *config.Config
 	spannerClient *spannerClient.Client
+}
+
+type colDiff struct {
+	column   string
+	expected any
+	actual   any
 }
 
 func NewValidator(config *config.Config, client *spannerClient.Client) *Validator {
@@ -74,27 +81,48 @@ func (v *Validator) validateTable(ctx context.Context, tableName string, tableCo
 	if len(tableConfig.Columns) > 0 {
 		for _, expectedData := range tableConfig.Columns {
 			matched := false
+			var bestDiffs []colDiff
+			// Try to find a row that matches all columns; otherwise remember the closest diffs
 			for _, actualData := range rows {
-				// Key sets must match exactly
 				if !sameKeySet(actualData, expectedData) {
 					continue
 				}
-				// Compare all columns
+				// Compare all columns and collect diffs
+				diffs := make([]colDiff, 0)
 				ok := true
 				for key, actualValue := range actualData {
 					expectedValue := expectedData[key]
 					if err := v.validateData(actualValue, expectedValue); err != nil {
 						ok = false
-						break
+						diffs = append(diffs, colDiff{
+							column:   key,
+							expected: expectedValue,
+							actual:   actualValue,
+						})
 					}
 				}
 				if ok {
 					matched = true
 					break
 				}
+				if len(bestDiffs) == 0 || len(diffs) < len(bestDiffs) {
+					bestDiffs = diffs
+				}
 			}
 			if !matched {
-				return fmt.Errorf("no row strictly matched spec (all columns required): %v", expectedData)
+				// Log pretty, multi-line report with emojis for readability
+				if len(bestDiffs) > 0 {
+					logging.L().Error(buildMismatchReport(tableName, bestDiffs))
+				} else {
+					// No row had the exact same key set; show key set differences to aid debugging
+					expKeys := sortedKeys(expectedData)
+					var exampleKeys []string
+					if len(rows) > 0 {
+						exampleKeys = sortedKeys(rows[0])
+					}
+					logging.L().Error(buildColumnSetMismatchReport(tableName, expKeys, exampleKeys))
+				}
+				return fmt.Errorf("no row strictly matched spec (all columns required)")
 			}
 		}
 	}
@@ -297,6 +325,116 @@ func sameKeySet(a, b map[string]any) bool {
 		}
 	}
 	return true
+}
+
+func valueToPretty(v any) string {
+	switch x := v.(type) {
+	case spanner.NullString:
+		if !x.Valid {
+			return "NULL(string)"
+		}
+		return x.StringVal
+	case spanner.NullInt64:
+		if !x.Valid {
+			return "NULL(int64)"
+		}
+		return fmt.Sprintf("%d", x.Int64)
+	case spanner.NullFloat64:
+		if !x.Valid {
+			return "NULL(float64)"
+		}
+		return fmt.Sprintf("%v", x.Float64)
+	case spanner.NullBool:
+		if !x.Valid {
+			return "NULL(bool)"
+		}
+		return fmt.Sprintf("%t", x.Bool)
+	case spanner.NullTime:
+		if !x.Valid {
+			return "NULL(timestamp)"
+		}
+		return x.Time.Format(time.RFC3339)
+	case spanner.NullDate:
+		if !x.Valid {
+			return "NULL(date)"
+		}
+		return x.Date.String()
+	case spanner.NullJSON:
+		if !x.Valid {
+			return "NULL(json)"
+		}
+		// Try to compact the JSON value
+		if x.Value == nil {
+			return "null"
+		}
+		b, err := json.Marshal(x.Value)
+		if err != nil {
+			return fmt.Sprintf("%v", x.Value)
+		}
+		return string(b)
+	case civil.Date:
+		return x.String()
+	case time.Time:
+		return x.Format(time.RFC3339)
+	case string:
+		// Keep as-is; if it looks like JSON, compact it to one line
+		if looksLikeJSON(x) {
+			var obj any
+			if err := json.Unmarshal([]byte(x), &obj); err == nil {
+				if b, err := json.Marshal(obj); err == nil {
+					return string(b)
+				}
+			}
+		}
+		return x
+	case map[string]any, []any:
+		b, err := json.Marshal(x)
+		if err != nil {
+			return fmt.Sprintf("%v", x)
+		}
+		return string(b)
+	default:
+		return fmt.Sprintf("%v", x)
+	}
+}
+
+func sortedKeys(m map[string]any) []string {
+	ks := make([]string, 0, len(m))
+	for k := range m {
+		ks = append(ks, k)
+	}
+	// simple insertion sort to avoid importing sort unnecessarily in this file
+	for i := 1; i < len(ks); i++ {
+		j := i
+		for j > 0 && ks[j-1] > ks[j] {
+			ks[j-1], ks[j] = ks[j], ks[j-1]
+			j--
+		}
+	}
+	return ks
+}
+
+func buildMismatchReport(table string, diffs []colDiff) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "✖️ table %s: expected row does not match\n", table)
+	fmt.Fprintf(&b, "    column mismatch: %d\n", len(diffs))
+	for i, d := range diffs {
+		fmt.Fprintf(&b, "\n  %d)  column: %s\n", i+1, d.column)
+		fmt.Fprintf(&b, "     ▸ expected: %s\n", valueToPretty(d.expected))
+		fmt.Fprintf(&b, "     ▸   actual: %s\n", valueToPretty(d.actual))
+
+	}
+	return b.String()
+}
+
+func buildColumnSetMismatchReport(table string, expectedCols, exampleActualCols []string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "✖️ table %s: expected column set does not match\n", table)
+	fmt.Fprintf(&b, "   🧩 expected columns: %s\n", strings.Join(expectedCols, ", "))
+	if len(exampleActualCols) > 0 {
+		fmt.Fprintf(&b, "   🔎 example actual:  %s\n", strings.Join(exampleActualCols, ", "))
+	}
+	return b.String()
 }
 
 func compareNumbers(actual any, expected any) error {
