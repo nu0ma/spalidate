@@ -66,5 +66,7 @@ dist/
 
 spanlidate
 
-.claude/settings.local.json
 .todo
+
+.serena
+.claude
