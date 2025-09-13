@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
 
 	"github.com/nu0ma/spalidate/internal/config"
+	"github.com/nu0ma/spalidate/internal/spanner"
+	"github.com/nu0ma/spalidate/internal/validator"
 	"github.com/spf13/cobra"
 )
 
@@ -49,6 +52,7 @@ func Execute() {
 }
 
 func run(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
 	configPath := args[0]
 
 	if verbose {
@@ -63,6 +67,20 @@ func run(cmd *cobra.Command, args []string) error {
 
 	if verbose {
 		log.Printf("Loaded config with %d tables", len(cfg.Tables))
+	}
+
+	spannerClient, err := spanner.NewClient(ctx, project, instance, database)
+	if err != nil {
+		return fmt.Errorf("creating spanner client: %w", err)
+	}
+
+	v := validator.NewValidator(cfg, spannerClient)
+	if err := v.Validate(); err != nil {
+		return fmt.Errorf("validation failed: %w", err)
+	}
+
+	if verbose {
+		log.Println("Validation completed successfully")
 	}
 
 	return nil

@@ -12,6 +12,7 @@ type Config struct {
 }
 
 type TableConfig struct {
+	Count   int                      `yaml:"count"`
 	Columns []map[string]interface{} `yaml:"columns,omitempty"`
 }
 
@@ -25,8 +26,6 @@ func LoadConfig(path string) (*Config, error) {
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse YAML: %w", err)
 	}
-
-	fmt.Printf("%+v\n", config)
 
 	return &config, nil
 }
