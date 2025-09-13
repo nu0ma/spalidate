@@ -36,15 +36,21 @@ func NewValidator(config *config.Config, client *spannerClient.Client) *Validato
 }
 
 func (v *Validator) Validate() error {
-	ctx := context.Background()
+    ctx := context.Background()
 
-	for tableName, tableConfig := range v.config.Tables {
-		if err := v.validateTable(ctx, tableName, tableConfig); err != nil {
-			return fmt.Errorf("validation failed for table %s: %w", tableName, err)
-		}
-	}
+    names := sortedTableNames(v.config.Tables)
+    var errs []string
+    for _, tableName := range names {
+        tableConfig := v.config.Tables[tableName]
+        if err := v.validateTable(ctx, tableName, tableConfig); err != nil {
+            errs = append(errs, fmt.Sprintf("validation failed for table %s: %v", tableName, err))
+        }
+    }
 
-	return nil
+    if len(errs) > 0 {
+        return errors.New(strings.Join(errs, "; "))
+    }
+    return nil
 }
 
 func (v *Validator) validateTable(ctx context.Context, tableName string, tableConfig config.TableConfig) error {
@@ -412,6 +418,21 @@ func sortedKeys(m map[string]any) []string {
 		}
 	}
 	return ks
+}
+
+func sortedTableNames(m map[string]config.TableConfig) []string {
+    ks := make([]string, 0, len(m))
+    for k := range m {
+        ks = append(ks, k)
+    }
+    for i := 1; i < len(ks); i++ {
+        j := i
+        for j > 0 && ks[j-1] > ks[j] {
+            ks[j-1], ks[j] = ks[j], ks[j-1]
+            j--
+        }
+    }
+    return ks
 }
 
 func buildMismatchReport(table string, diffs []colDiff) string {
