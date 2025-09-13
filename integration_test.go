@@ -46,6 +46,8 @@ CREATE TABLE Books (
 ) PRIMARY KEY (BookID);
 `
 
+var ddls = parseSchemaStatements(string(schema))
+
 func TestMain(m *testing.M) {
 	ctx := context.Background()
 
@@ -58,7 +60,6 @@ func TestMain(m *testing.M) {
 		panic(fmt.Sprintf("Failed to create emulator: %v", err))
 	}
 
-	// Get emulator host
 	host, err := emulator.Host(ctx)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to get emulator host: %v", err))
@@ -72,7 +73,6 @@ func TestMain(m *testing.M) {
 		panic(fmt.Sprintf("Failed to set SPANNER_EMULATOR_HOST: %v", err))
 	}
 
-	// Run tests
 	code := m.Run()
 	teardown()
 	os.Exit(code)
@@ -179,9 +179,10 @@ func insertTestData(ctx context.Context, client *spanner.Client, mutations []*sp
 
 func TestCLIValidation(t *testing.T) {
 	ctx := context.Background()
+	t.Parallel()
 
 	t.Run("TestWithExistingValidationFile", func(t *testing.T) {
-		ddls := parseSchemaStatements(string(schema))
+		t.Parallel()
 		clients, clientsTeardown, err := spanemuboost.NewClients(ctx, emulator,
 			spanemuboost.EnableDatabaseAutoConfigOnly(),
 			spanemuboost.WithRandomDatabaseID(),
@@ -209,7 +210,7 @@ func TestCLIValidation(t *testing.T) {
 	})
 
 	t.Run("TestMultipleColumnsMatching_Success", func(t *testing.T) {
-		ddls := parseSchemaStatements(string(schema))
+		t.Parallel()
 		clients, clientsTeardown, err := spanemuboost.NewClients(ctx, emulator,
 			spanemuboost.EnableDatabaseAutoConfigOnly(),
 			spanemuboost.WithRandomDatabaseID(),
@@ -234,7 +235,7 @@ func TestCLIValidation(t *testing.T) {
 	})
 
 	t.Run("TestMultipleColumnsMatching_Failure", func(t *testing.T) {
-		ddls := parseSchemaStatements(string(schema))
+		t.Parallel()
 		clients, clientsTeardown, err := spanemuboost.NewClients(ctx, emulator,
 			spanemuboost.EnableDatabaseAutoConfigOnly(),
 			spanemuboost.WithRandomDatabaseID(),
