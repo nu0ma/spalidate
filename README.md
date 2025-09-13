@@ -1,5 +1,10 @@
 # Spalidate
 
+[![Tests](https://github.com/nu0ma/spalidate/actions/workflows/test.yml/badge.svg)](https://github.com/nu0ma/spalidate/actions/workflows/test.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/nu0ma/spalidate)](https://goreportcard.com/report/github.com/nu0ma/spalidate)
+[![GoDoc](https://pkg.go.dev/badge/github.com/nu0ma/spalidate)](https://pkg.go.dev/github.com/nu0ma/spalidate)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Validate Google Cloud Spanner data (emulator supported) against expectations written in YAML. Simple CLI, fast feedback.
 
 ## Install
@@ -46,15 +51,14 @@ tables:
 ```bash
 spalidate --project <your-project> --instance <your-instance> --database <your-database> ./validation.yaml
 ```
-
 On success: `Validation passed for all tables`
 
-If not successful:
+
+### If not successful:
 
 ```bash
 2025/09/13 19:09:25 ERRO ✖️ table Books: expected row does not match
                 column mismatch: 1
-```
               1)  column: JSONData
                  ▸ expected: {"genre":"Fiction","ratifeawfng":4.5}
                  ▸   actual: {"genre": "invalid", "rating": 4.5}
@@ -78,6 +82,7 @@ If not successful:
                  ▸   actual: 1
 ```
 
+You will see logs like the ones shown above.
 
 ## License
 
